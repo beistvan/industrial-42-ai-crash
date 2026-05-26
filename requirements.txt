@@ -1,0 +1,12 @@
+numpy
+pandas
+scikit-learn
+matplotlib
+streamlit
+plotly
+pydantic
+pyyaml
+tqdm
+pytest
+ruff
+# install torch separately for target GPU/CUDA environment if needed
