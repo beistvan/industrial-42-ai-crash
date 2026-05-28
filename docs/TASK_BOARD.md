@@ -31,3 +31,53 @@
 | Record fallback demo | B | Human | 90-sec video/screen capture |
 | Final pitch | B | Claude/DeepSeek | 3-minute pitch rehearsed |
 | Judge Q&A | Both | DeepSeek | 10 hard questions answered |
+
+---
+
+# Task board — Industrial: Models that learn how processes unfold
+
+Use this file as the only task board.
+
+## Frozen / done
+
+- Baseline scaffold exists.
+- Mock-data generator exists.
+- Baseline metric artifact exists.
+- Tests pass on mock data.
+- Streamlit demo has a working scenario/recommendation shell.
+
+## Do now, before the reveal
+
+- [ ] Commit the current passing state.
+- [ ] Verify `make smoke`, `make test`, and `make run-demo`.
+- [ ] Do not tune synthetic metrics.
+- [ ] Do not rewrite architecture.
+- [ ] Do not follow old orchestration paths.
+
+## Do first tomorrow, after real data arrives
+
+- [ ] Create `docs/REAL_BRIEF.md` with the official task, success metric, constraints, and deliverable format.
+- [ ] Copy real data into `data/raw/` without modifying the original file.
+- [ ] Inspect schema and examples.
+- [ ] Identify target/outcome and evaluation metric.
+- [ ] Map real data to baseline features.
+- [ ] Run the baseline and update `artifacts/metrics.json`.
+- [ ] Update demo labels so they match the official case.
+
+## Improve only after baseline works
+
+Possible improvements:
+
+- better feature engineering;
+- calibrated confidence/uncertainty;
+- model comparison table;
+- clearer explanation trace;
+- real-data error analysis;
+- judge-friendly demo flow.
+
+## Do not do
+
+- Do not improve synthetic scores for their own sake.
+- Do not touch the other two track repos after selection.
+- Do not spend time reconciling old instruction files.
+- Do not build a complex model before real-data baseline is running.
