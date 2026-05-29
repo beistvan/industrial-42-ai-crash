@@ -21,17 +21,23 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src.data import FAMILIES, load_all_families  # noqa: E402
+from src.data import (  # noqa: E402
+    FAMILIES,
+    load_all_families,
+    load_extra_families,
+    merge_sequence_maps,
+)
 from src.eval.run_eval import evaluate_all  # noqa: E402
 from src.ml import NGramBaseline  # noqa: E402
 
 
-def _load_split(split_dir: Path):
+def _load_split(split_dir: Path, extra_data_dir: Path | None = None):
     train_ids = json.loads((split_dir / "train_ids.json").read_text(encoding="utf-8"))
     all_seqs = load_all_families()
     train = {fam: {sid: all_seqs[fam][sid] for sid in train_ids.get(fam, [])}
              for fam in FAMILIES}
-    return train
+    extras = load_extra_families(extra_data_dir)
+    return merge_sequence_maps(train, extras), {fam: len(extras.get(fam, {})) for fam in FAMILIES}
 
 
 def main() -> None:
@@ -45,6 +51,8 @@ def main() -> None:
                     default=REPO_ROOT / "models" / "ngram_baseline.pkl")
     ap.add_argument("--metrics-path", type=Path,
                     default=REPO_ROOT / "artifacts" / "ngram_metrics.json")
+    ap.add_argument("--extra-data-dir", type=Path, default=None,
+                    help="Optional directory of generated extra CSVs to augment training.")
     args = ap.parse_args()
 
     if not (args.split_dir / "train_ids.json").exists():
@@ -54,8 +62,10 @@ def main() -> None:
         )
 
     print(f"[1/3] Loading split from {args.split_dir}")
-    train = _load_split(args.split_dir)
+    train, extra_counts = _load_split(args.split_dir, args.extra_data_dir)
     print("      train: " + ", ".join(f"{f}={len(s)}" for f, s in train.items()))
+    if args.extra_data_dir:
+        print("      extras: " + ", ".join(f"{f}={extra_counts[f]}" for f in FAMILIES))
 
     print(f"[2/3] Fitting NGramBaseline(max_order={args.max_order})")
     t0 = time.time()
@@ -75,6 +85,8 @@ def main() -> None:
         "run_id": f"{timestamp}_ngram_max{args.max_order}",
         "timestamp": timestamp,
         "model": model.stats(),
+        "extra_data_dir": str(args.extra_data_dir) if args.extra_data_dir else None,
+        "extra_counts": extra_counts,
         "fit_seconds": round(fit_seconds, 2),
         "eval_seconds": round(eval_seconds, 2),
         "metrics": metrics.to_dict(),

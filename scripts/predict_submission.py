@@ -32,7 +32,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from src.data.infineon_loader import Family, FAMILIES  # noqa: E402
 from src.eval.rule_validator import classify_sequence  # noqa: E402
-from src.ml import NGramBaseline  # noqa: E402
+from src.ml import load_sequence_model  # noqa: E402
 
 
 def _infer_family(sid: str, explicit: str | None) -> Family:
@@ -71,7 +71,7 @@ def _read_eval_csv(path: Path) -> dict[str, tuple[Family, list[str]]]:
             for sid, steps in out_steps.items()}
 
 
-def write_nextstep(model: NGramBaseline, inputs: dict, out_path: Path, k: int = 5) -> None:
+def write_nextstep(model, inputs: dict, out_path: Path, k: int = 5) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
@@ -82,7 +82,7 @@ def write_nextstep(model: NGramBaseline, inputs: dict, out_path: Path, k: int = 
                 w.writerow([sid, rank, step])
 
 
-def write_completion(model: NGramBaseline, inputs: dict, out_path: Path) -> None:
+def write_completion(model, inputs: dict, out_path: Path) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
@@ -113,7 +113,7 @@ def main() -> None:
                     help="Task 3 input CSV (full sequences).")
     ap.add_argument("--out-dir", type=Path, default=REPO_ROOT / "extras" / "results")
     args = ap.parse_args()
-    model = NGramBaseline.load(args.model)
+    model = load_sequence_model(args.model)
     if args.eval_valid:
         valid_inputs = _read_eval_csv(args.eval_valid)
         write_nextstep(model, valid_inputs, args.out_dir / "nextstep.csv")

@@ -34,7 +34,9 @@ For execution during the hackathon, read these in order:
 5. `docs/FINETUNE_OPTION_REVIEW.md` — why we are not leading with a
    HuggingFace pretrained fine-tune.
 6. `docs/LEONARDO_ONBOARDING.md` — AI:AT HPC access checklist (phase 2).
-7. `artifacts/ngram_metrics.json` — latest baseline evidence.
+7. `docs/TRANSFORMER_MODEL.md` — compact decoder-only Transformer usage.
+8. `docs/LOCAL_AUGMENTATION.md` — local Step 6 data generation / augmentation.
+9. `artifacts/ngram_metrics.json` — latest baseline evidence.
 
 Older planning docs (`AGENTS.md`, `MEMORY.md`, `RULES.md`, `SKILLS.md`,
 `docs/GPU_COMPUTE_PLAN.md`, `docs/LLM_ORCHESTRATION_FOR_THIS_REPO.md`) are
@@ -48,8 +50,17 @@ source .venv/bin/activate  # Windows PowerShell: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
 make smoke              # dev split + n-gram train + tests + smoke check
-make run-demo           # Streamlit demo (Task 1/2/3 + explanation + audit trace)
+make run-demo           # Streamlit demo (n-gram or Transformer, Task 1/2/3 + audit trace)
 make run-dashboard      # Streamlit run-history dashboard
+
+# Optional local Transformer path, CPU-safe smoke first:
+make train-transformer-smoke
+make train-transformer-small-local
+
+# Optional Step 6 local augmentation, still GPU-free:
+make generate-extra-local
+make train-ngram-extra
+make train-transformer-small-extra-local
 ```
 
 `make smoke` produces:
@@ -59,9 +70,9 @@ make run-dashboard      # Streamlit run-history dashboard
 3. 20 passing pytests and a smoke check that the real-data pipeline is wired.
 
 `make run-demo` reads those artifacts and shows Task 1/2/3 headline numbers,
-per-family breakdown, a live next-step demo, an explanation of the
-suffix-backoff match, and a full audit trace (matched suffix, top-k probs,
-rule violations with step indexes).
+per-family breakdown, a live next-step demo, an explanation of the active model,
+and a full audit trace. The sidebar can switch between `models/ngram_baseline.pkl`
+and any available `models/transformer_*.pt` checkpoint.
 
 ## Current baseline state (n-gram, max_order=8, 50 dev/family, n=300)
 
@@ -86,8 +97,9 @@ different orders to see the dashboard's improvement trend.
 | Vendor official Infineon data | done (PR #1) | — |
 | N-gram baseline + dev split + evaluator + tests | done (PR #2) | — |
 | Eval dashboard + run history | done (PR #3) | — |
-| Independent evaluator | placeholder at `src/eval/local_eval.py` | friend |
-| Small from-scratch transformer | placeholder at `src/ml/transformer_model.py` + `scripts/train_transformer.py` | next |
+| Independent evaluator | done, shared model loader | `src/eval/local_eval.py` |
+| Small from-scratch transformer | local CPU/smoke implementation done | `src/ml/transformer_model.py`, `scripts/train_transformer.py` |
+| Local generated-data augmentation | done for CPU/local prep | `scripts/generate_extra_sequences.py` |
 | Leonardo HPC access | doc'd at `docs/LEONARDO_ONBOARDING.md` | per-person |
 | One contrast HF fine-tune (`distilgpt2`) | optional, see `docs/FINETUNE_OPTION_REVIEW.md` | stretch |
 
@@ -97,7 +109,7 @@ different orders to see the dashboard's improvement trend.
 - Do not commit any credential, SSH key, certificate, Leonardo link, or
   Discord invite.
 - Do not start cluster training before the local pipeline (n-gram + dev
-  eval + dashboard) is green.
+  eval + dashboard + Transformer smoke) is green.
 
 ## Stop rule
 
