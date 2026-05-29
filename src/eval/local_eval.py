@@ -2,7 +2,7 @@
 
 The primary evaluator for implemented models is `src.eval.run_eval`, which
 scores a model object with `predict_topk()` and `complete()`. This file provides
-a lightweight command-line entrypoint for saved n-gram models, so hackathon
+a lightweight command-line entrypoint for saved n-gram or Transformer models, so hackathon
 runs can be reproduced with one command.
 """
 from __future__ import annotations
@@ -17,14 +17,14 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.eval.run_eval import evaluate_all  # noqa: E402
-from src.ml import NGramBaseline  # noqa: E402
+from src.ml import load_sequence_model  # noqa: E402
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", type=Path,
                         default=REPO_ROOT / "models" / "ngram_baseline.pkl",
-                        help="Saved NGramBaseline pickle to evaluate.")
+                        help="Saved model: .pkl n-gram or .pt Transformer checkpoint.")
     parser.add_argument("--eval-dir", type=Path,
                         default=REPO_ROOT / "data" / "processed" / "dev_eval",
                         help="Directory created by scripts/make_dev_split.py.")
@@ -50,9 +50,10 @@ def main() -> None:
             "\nRun: python scripts/make_dev_split.py --force"
         )
 
-    model = NGramBaseline.load(args.model)
+    model = load_sequence_model(args.model)
     metrics = evaluate_all(model, args.eval_dir).to_dict()
-    payload = {"model": model.stats(), "metrics": metrics}
+    stats = model.stats() if hasattr(model, "stats") else {"model": type(model).__name__}
+    payload = {"model": stats, "metrics": metrics}
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(json.dumps(payload, indent=2))

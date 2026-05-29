@@ -87,6 +87,61 @@ def load_all_families(
     return {fam: load_family(fam, data_root) for fam in FAMILIES}
 
 
+def load_sequence_csv(path: Path) -> Sequences:
+    """Read any long-format Infineon sequence CSV via the official parser.
+
+    The CSV must have the same layout as the official training data: at least
+    `SEQUENCE_ID` and `STEP` columns. Extra columns such as `FAMILY` are
+    ignored by the official parser.
+    """
+    if not path.exists():
+        raise FileNotFoundError(f"Missing sequence CSV: {path}")
+    mod = _load_official_module()
+    return mod.read_csv_sequences(path)
+
+
+def _infer_family_from_path(path: Path) -> Family | None:
+    """Best-effort family inference for generated CSV filenames."""
+    low = path.name.lower()
+    for family in FAMILIES:
+        if family in low:
+            return family
+    return None
+
+
+def load_extra_families(extra_data_dir: Path | None) -> dict[Family, Sequences]:
+    """Load optional generated training sequences from a directory.
+
+    The helper scans `*.csv` files under `extra_data_dir` and assigns each file
+    to a family by filename (`mosfet`, `igbt`, or `ic`). Sequence ids are
+    prefixed with the source filename stem, so generated ids cannot collide with
+    official training ids. Missing directories simply return empty family maps.
+    """
+    out: dict[Family, Sequences] = {fam: {} for fam in FAMILIES}
+    if extra_data_dir is None or not extra_data_dir.exists():
+        return out
+    for csv_path in sorted(extra_data_dir.glob("*.csv")):
+        family = _infer_family_from_path(csv_path)
+        if family is None:
+            continue
+        for sid, steps in load_sequence_csv(csv_path).items():
+            out[family][f"{csv_path.stem}::{sid}"] = steps
+    return out
+
+
+def merge_sequence_maps(
+    base: dict[Family, Sequences],
+    extra: dict[Family, Sequences] | None,
+) -> dict[Family, Sequences]:
+    """Return a family-indexed copy of `base` augmented with `extra`."""
+    merged: dict[Family, Sequences] = {fam: dict(base.get(fam, {})) for fam in FAMILIES}
+    if not extra:
+        return merged
+    for family in FAMILIES:
+        merged[family].update(extra.get(family, {}))
+    return merged
+
+
 @dataclass(frozen=True)
 class Vocabulary:
     """Deterministic token -> int mapping shared across all three families.

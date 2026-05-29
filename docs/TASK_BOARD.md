@@ -21,10 +21,11 @@ and intentionally removed — see git history if you need it.
 
 | Task | Status | Pointer |
 | --- | --- | --- |
-| Independent evaluator cross-check | placeholder | `src/eval/local_eval.py` |
-| Small from-scratch transformer | placeholder | `src/ml/transformer_model.py`, `scripts/train_transformer.py` |
+| Independent evaluator cross-check | implemented | `src/eval/local_eval.py` |
+| Small from-scratch transformer | implemented locally; GPU scaling next | `src/ml/transformer_model.py`, `scripts/train_transformer.py` |
 | Beam search for Task 2 completion | not started | `src/ml/ngram_baseline.complete` |
-| Submission writer | scaffolded | `scripts/predict_submission.py` |
+| Submission writer | supports n-gram + Transformer | `scripts/predict_submission.py` |
+| Local generated-data augmentation | implemented | `scripts/generate_extra_sequences.py` |
 | Leonardo HPC access | doc'd | `docs/LEONARDO_ONBOARDING.md` |
 | Optional `distilgpt2` contrast | optional | `docs/FINETUNE_OPTION_REVIEW.md` |
 
