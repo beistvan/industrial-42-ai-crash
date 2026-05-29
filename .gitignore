@@ -25,6 +25,10 @@ __pycache__/
 !/checkpoints/.gitkeep
 !/artifacts/.gitkeep
 
+# Track-provided Infineon data (vendored from Lumos-Data/zero_one_hack_01)
+!/data/raw/infineon/
+!/data/raw/infineon/**
+
 # OS / IDE
 .DS_Store
 .vscode/settings.json
