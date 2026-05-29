@@ -28,8 +28,61 @@ from src.eval.metrics import (  # noqa: E402
     normalized_edit_distance,
     token_accuracy,
 )
-from src.eval.rule_validator import classify_sequence  # noqa: E402
+from src.eval.rule_validator import _validate, classify_sequence  # noqa: E402
 from src.ml import NGramBaseline  # noqa: E402
+
+
+def explain_next_step(
+    model: NGramBaseline, family: str, prefix: list[str], k: int = 5
+) -> dict:
+    """Reproduce the suffix-backoff lookup so we can explain the prediction.
+
+    Returns the matched suffix order, the matched suffix tokens, and the
+    top-k tokens with their raw counts and renormalized probabilities. If
+    no suffix matched, falls back to the unconditional distribution and
+    reports order=0.
+    """
+    for order in range(min(model.max_order, len(prefix)), 0, -1):
+        suffix = tuple(prefix[-order:])
+        counts = model.suffix_counts[family].get(suffix)
+        if counts:
+            top = counts.most_common(k)
+            total = sum(counts.values())
+            return {
+                "matched_suffix_order": order,
+                "matched_suffix": list(suffix),
+                "candidates_seen_after_suffix": total,
+                "topk": [
+                    {"token": t, "count": c, "prob": round(c / total, 4)}
+                    for t, c in top
+                ],
+                "backoff": False,
+            }
+    counts = model.unconditional[family]
+    top = counts.most_common(k)
+    total = sum(counts.values()) or 1
+    return {
+        "matched_suffix_order": 0,
+        "matched_suffix": [],
+        "candidates_seen_after_suffix": total,
+        "topk": [
+            {"token": t, "count": c, "prob": round(c / total, 4)}
+            for t, c in top
+        ],
+        "backoff": True,
+    }
+
+
+def violation_records(steps: list[str]) -> list[dict]:
+    """Structured per-violation info for the audit trace."""
+    return [
+        {
+            "rule": v.rule,
+            "step_index": getattr(v, "step_index", None),
+            "description": getattr(v, "description", ""),
+        }
+        for v in _validate(steps)
+    ]
 
 METRICS_PATH = REPO_ROOT / "artifacts" / "ngram_metrics.json"
 MODEL_PATH = REPO_ROOT / "models" / "ngram_baseline.pkl"
@@ -276,6 +329,82 @@ st.caption(
     "Task 3 uses the official Infineon rule validator "
     "(`data/raw/infineon/training_data/generate_sequences.py::validate_sequence`)."
 )
+
+# ============================================================ explanation
+st.markdown("### Explanation — why the model picked these steps")
+expl = explain_next_step(model, family, prefix, k=5)
+
+if expl["backoff"]:
+    st.warning(
+        "**Backoff fired** — none of the suffixes of the current prefix were "
+        f"ever seen during training. Falling back to the **unconditional "
+        f"token distribution** for family `{family}` "
+        f"(observed {expl['candidates_seen_after_suffix']} tokens total)."
+    )
+else:
+    st.info(
+        f"Matched a suffix of order **{expl['matched_suffix_order']}** "
+        f"(max_order={model.max_order}). Out of "
+        f"**{expl['candidates_seen_after_suffix']}** training continuations "
+        f"that followed this exact suffix, the top-5 are below. The greedy "
+        f"completion repeats this argmax lookup at every step until "
+        f"`SHIP LOT` or 400 steps."
+    )
+
+ex_l, ex_r = st.columns([1, 1])
+with ex_l:
+    st.markdown("**Matched suffix (last k tokens of the prefix)**")
+    if expl["matched_suffix"]:
+        st.code(" → ".join(expl["matched_suffix"]), language="text")
+    else:
+        st.code("(empty — backoff)", language="text")
+with ex_r:
+    st.markdown("**Top-5 with counts + renormalized probability**")
+    st.dataframe(pd.DataFrame(expl["topk"]), width="stretch", hide_index=True)
+
+# ============================================================ audit trace
+st.markdown("### Audit trace — full decision pipeline")
+gold_violations = violation_records(full)
+pred_violations = violation_records(completed)
+
+audit = {
+    "input": {
+        "sequence_id": sid,
+        "family": family,
+        "total_steps": len(full),
+        "prefix_len": prefix_len,
+        "gold_continuation_len": len(gold_continuation),
+    },
+    "model": {
+        "name": model_info.get("model", "ngram_suffix_backoff"),
+        "max_order": model_info.get("max_order"),
+        "run_id": run_id,
+    },
+    "task1_next_step": {
+        "matched_suffix_order": expl["matched_suffix_order"],
+        "backoff_used": expl["backoff"],
+        "candidates_seen_after_suffix": expl["candidates_seen_after_suffix"],
+        "topk": expl["topk"],
+        "gold_next_step": gold_next,
+        "gold_rank_in_top5": rank,
+    },
+    "task2_completion": {
+        "predicted_length": len(pred_continuation),
+        "gold_length": len(gold_continuation),
+        "token_accuracy": round(tok_acc, 4),
+        "normalized_edit_distance": round(ned, 4),
+        "exact_match": bool(exact and gold_continuation),
+        "stopped_on_ship_lot": completed[-1] == "SHIP LOT" if completed else False,
+    },
+    "task3_anomaly": {
+        "gold_sequence_valid": classify_full["valid"],
+        "gold_violations": gold_violations,
+        "predicted_completion_valid": classify_pred["valid"],
+        "predicted_violations": pred_violations,
+    },
+}
+
+st.json(audit, expanded=False)
 
 with st.expander("Raw `artifacts/ngram_metrics.json`", expanded=False):
     st.json(metrics_payload)
