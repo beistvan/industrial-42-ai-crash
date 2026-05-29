@@ -1,83 +1,44 @@
 # Task Board — Industrial: Models that learn how processes unfold
 
-## Phase 0 — before case reveal
-| Task | Owner | Tool | Acceptance |
-|---|---|---|---|
-| Verify repo runs | A | Codex/Copilot | `make test` and `make run-demo` work |
-| Draft demo scenario | B | Claude/DeepSeek | One scenario judges understand in 30 seconds |
-| Prepare fallback dataset | A | Claude/Codex | Loader works on sample data |
-| Prepare pitch skeleton | B | Claude | 6-slide pitch outline exists |
+Use this file as the only task board. Phase 0 (pre-hack scaffolding) is done
+and intentionally removed — see git history if you need it.
 
-## Phase 1 — Friday night
-| Task | Owner | Tool | Acceptance |
-|---|---|---|---|
-| Ingest event data | A | Codex | Data schema validated |
-| Build first baseline | A | Copilot/Codex | Baseline metric printed |
-| UI scenario screen | B | Copilot | Demo screen loads sample |
-| Track-specific story | B | Claude | Problem/solution/metric locked |
+## Done
 
-## Phase 2 — Saturday
-| Task | Owner | Tool | Acceptance |
-|---|---|---|---|
-| Improved model/layer | A | Codex | Beats baseline or is justified |
-| Evaluation report | A | Claude/Codex | Metrics + chart saved |
-| Integrated UI | B | Copilot/Codex | Model output appears in UI |
-| Mentor feedback loop | Both | Human | 3 feedback items implemented/cut |
+- Real Infineon `training_data/` vendored (`data/raw/infineon/`).
+- Deterministic train/dev split (`scripts/make_dev_split.py`).
+- N-gram suffix-backoff baseline + persistence
+  (`src/ml/ngram_baseline.py`, `models/ngram_baseline.pkl`).
+- Task 1/2/3 evaluator (`src/eval/run_eval.py`) and rule-validator wrapper
+  (`src/eval/rule_validator.py`).
+- Metrics + per-run snapshots
+  (`artifacts/ngram_metrics.json`, `artifacts/runs/*.json`).
+- Streamlit demo + run-history dashboard
+  (`src/app/main.py`, `src/app/eval_dashboard.py`).
+- `make smoke` runs the real-data pipeline end-to-end + pytest (20 tests).
 
-## Phase 3 — Sunday
-| Task | Owner | Tool | Acceptance |
-|---|---|---|---|
-| Freeze code | A | Codex | Clean run from README |
-| Record fallback demo | B | Human | 90-sec video/screen capture |
-| Final pitch | B | Claude/DeepSeek | 3-minute pitch rehearsed |
-| Judge Q&A | Both | DeepSeek | 10 hard questions answered |
+## In progress / next
 
----
+| Task | Status | Pointer |
+| --- | --- | --- |
+| Independent evaluator cross-check | placeholder | `src/eval/local_eval.py` |
+| Small from-scratch transformer | placeholder | `src/ml/transformer_model.py`, `scripts/train_transformer.py` |
+| Beam search for Task 2 completion | not started | `src/ml/ngram_baseline.complete` |
+| Submission writer | scaffolded | `scripts/predict_submission.py` |
+| Leonardo HPC access | doc'd | `docs/LEONARDO_ONBOARDING.md` |
+| Optional `distilgpt2` contrast | optional | `docs/FINETUNE_OPTION_REVIEW.md` |
 
-# Task board — Industrial: Models that learn how processes unfold
+## Improvement levers (only after the next model lands)
 
-Use this file as the only task board.
-
-## Frozen / done
-
-- Baseline scaffold exists.
-- Mock-data generator exists.
-- Baseline metric artifact exists.
-- Tests pass on mock data.
-- Streamlit demo has a working scenario/recommendation shell.
-
-## Do now, before the reveal
-
-- [ ] Commit the current passing state.
-- [ ] Verify `make smoke`, `make test`, and `make run-demo`.
-- [ ] Do not tune synthetic metrics.
-- [ ] Do not rewrite architecture.
-- [ ] Do not follow old orchestration paths.
-
-## Do first tomorrow, after real data arrives
-
-- [ ] Create `docs/REAL_BRIEF.md` with the official task, success metric, constraints, and deliverable format.
-- [ ] Copy real data into `data/raw/` without modifying the original file.
-- [ ] Inspect schema and examples.
-- [ ] Identify target/outcome and evaluation metric.
-- [ ] Map real data to baseline features.
-- [ ] Run the baseline and update `artifacts/metrics.json`.
-- [ ] Update demo labels so they match the official case.
-
-## Improve only after baseline works
-
-Possible improvements:
-
-- better feature engineering;
-- calibrated confidence/uncertainty;
-- model comparison table;
-- clearer explanation trace;
-- real-data error analysis;
-- judge-friendly demo flow.
+- Beam search + grammar-constrained decoding for Task 2 exact match.
+- Per-family `max_order` tuning + Kneser–Ney smoothing on the n-gram.
+- Transformer ensembling with the n-gram for low-suffix-coverage prefixes.
+- Augment with `generate_sequences.py --count 10000` for scaling rows.
+- Calibrated confidence on top-k (entropy / margin).
 
 ## Do not do
 
-- Do not improve synthetic scores for their own sake.
+- Do not improve the n-gram with tricks the transformer can't match —
+  optimize for the metric, not the model.
 - Do not touch the other two track repos after selection.
-- Do not spend time reconciling old instruction files.
-- Do not build a complex model before real-data baseline is running.
+- Do not start cluster training before the local pipeline is green.

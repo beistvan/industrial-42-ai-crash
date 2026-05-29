@@ -1,8 +1,8 @@
 # Data Spec — Infineon Industrial AI track
 
-This is the **real** data spec for the hackathon. The previous pre-hack mock
-spec (`MOCK_DATA_SPEC.md`) described tabular sensor telemetry and is kept for
-historical reference only — it does **not** match the actual task.
+This is the data spec for the Infineon track. Source-of-truth for the
+process grammar is
+[`data/raw/infineon/training_data/generation_rules.md`](../data/raw/infineon/training_data/generation_rules.md).
 
 ## Source
 
@@ -91,10 +91,3 @@ Organizers distribute these at kickoff. Drop them at:
 The scoring script `eval_metrics.py` is also organizer-provided and runs
 without external dependencies.
 
-## What changed vs. the pre-hack scaffold
-
-The pre-hack `data/raw/mock_process_sequences.csv` was numeric sensor
-telemetry over a 6-step generic process. The real task has **no sensor
-columns**, a **120-token vocabulary**, and **sequence-level** anomaly labels.
-Existing tabular baselines (`src/ml/baseline.py`) do not apply and will be
-replaced by a sequence baseline + transformer in subsequent PRs.

@@ -37,8 +37,8 @@ For execution during the hackathon, read these in order:
 7. `artifacts/ngram_metrics.json` — latest baseline evidence.
 
 Older planning docs (`AGENTS.md`, `MEMORY.md`, `RULES.md`, `SKILLS.md`,
-`docs/APP_BLUEPRINT.md`, `docs/GPU_COMPUTE_PLAN.md`,
-`docs/LLM_ORCHESTRATION_FOR_THIS_REPO.md`) are reference only.
+`docs/GPU_COMPUTE_PLAN.md`, `docs/LLM_ORCHESTRATION_FOR_THIS_REPO.md`) are
+reference only.
 
 ## Quickstart
 
@@ -47,18 +47,21 @@ python -m venv .venv
 source .venv/bin/activate  # Windows PowerShell: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
-python scripts/make_dev_split.py --dev-per-family 100
-python scripts/train_ngram.py    --max-order 8
-streamlit run src/app/eval_dashboard.py
+make smoke              # dev split + n-gram train + tests + smoke check
+make run-demo           # Streamlit demo (Task 1/2/3 + explanation + audit trace)
+make run-dashboard      # Streamlit run-history dashboard
 ```
 
-Three commands give you:
+`make smoke` produces:
 1. a deterministic train/dev split under `data/processed/`,
 2. a fitted n-gram baseline at `models/ngram_baseline.pkl` + metrics at
-   `artifacts/ngram_metrics.json` + a per-run snapshot at
-   `artifacts/runs/`,
-3. a live Streamlit dashboard with Task 1/2/3 metrics, per-family
-   breakdown, and run history charts.
+   `artifacts/ngram_metrics.json` + a per-run snapshot at `artifacts/runs/`,
+3. 20 passing pytests and a smoke check that the real-data pipeline is wired.
+
+`make run-demo` reads those artifacts and shows Task 1/2/3 headline numbers,
+per-family breakdown, a live next-step demo, an explanation of the
+suffix-backoff match, and a full audit trace (matched suffix, top-k probs,
+rule violations with step indexes).
 
 ## Current baseline state (n-gram, max_order=8, 50 dev/family, n=300)
 
@@ -95,9 +98,6 @@ different orders to see the dashboard's improvement trend.
   Discord invite.
 - Do not start cluster training before the local pipeline (n-gram + dev
   eval + dashboard) is green.
-- Do not delete or "fix" the mock pipeline files (`scripts/generate_mock_data.py`,
-  `src/ml/baseline.py`, `artifacts/metrics.json`) without a plan — they are
-  historical context, not load-bearing.
 
 ## Stop rule
 

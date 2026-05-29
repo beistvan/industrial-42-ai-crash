@@ -1,75 +1,42 @@
 # Judge Card — Industrial / Infineon
 
-## One-liner
-Process Sequence Model helps users learn process evolution from event/sensor sequences with a measurable pipeline, a baseline comparison, and a working demo.
-
-## What we will build if this track is chosen
-sequence encoder + next-state prediction + anomaly/trajectory explanation.
-
-## User-facing value
-process timeline viewer with predicted next steps, drift warning, anomaly heatmap, and what-changed explanation.
-
-## Data assumption
-hackathon provided process logs/telemetry; fallback: synthetic multi-stage manufacturing traces with drift and defects.
-
-## Baseline
-rolling statistics + GRU/1D-CNN baseline.
-
-## Advanced model path
-Transformer encoder / TCN / hybrid state-space fallback with masked-step prediction.
-
-## Evaluation metrics
-next-step accuracy, masked reconstruction loss, anomaly AUROC, early-warning lead time, inference latency.
-
-## Why judges should care
-Judge sees a real trained sequence model that predicts/understands process dynamics instead of a static classifier.
-
-## Cut line
-If time is short, keep baseline + eval + demo. Cut the advanced model before cutting the demo.
-
----
-
-# Judge card — Industrial: Models that learn how processes unfold
-
-Use this page for the final story. Keep it short.
-
 ## Problem
+Given partial semiconductor fabrication sequences (MOSFET / IGBT / IC, ~120
+step vocabulary), predict the next step, complete the sequence, and detect
+rule-violating sequences. A hidden 4th product family scores OOD
+generalization post-submission.
 
-predict process state, bottleneck risk, or anomaly from process telemetry.
+## Baseline shipped
+Family-conditioned suffix-backoff **n-gram** (`src/ml/ngram_baseline.py`),
+`max_order=8`, trained on 900 sequences/family from the official Infineon
+`training_data/`. Anomaly detection uses the official `validate_sequence`
+rule validator unmodified.
 
-## Data assumption
+## Current evidence (`artifacts/ngram_metrics.json`, dev split = 100/family)
 
-Likely data type: process sequence / sensor / event-log / manufacturing telemetry data.
-
-## Baseline
-
-RandomForest anomaly classifier on synthetic process-sequence telemetry.
-
-Current evidence:
-
-- Rows: `2400`
-- Accuracy: `0.9983`
-- F1 anomaly: `0.9934`
-- Baseline: RandomForest anomaly classifier on synthetic process-sequence telemetry
+| Task | Metric | Value |
+| --- | --- | ---: |
+| 1 — next-step | Top-1 | **0.693** |
+| 1 — next-step | Top-5 | **0.988** |
+| 1 — next-step | MRR | **0.838** |
+| 2 — completion | Token accuracy | 0.405 |
+| 2 — completion | Norm. edit distance | 0.224 |
+| 3 — anomaly | F1 (invalid) | **1.000** |
+| 3 — anomaly | Rule attribution | 0.667 |
 
 ## What the demo proves
+- Real data → real metrics: no mock data, no RandomForest.
+- Reproducible with one command (`make smoke` → `make run-demo`).
+- Decisions are explainable: matched suffix order, top-k probabilities,
+  per-violation rule + step index.
+- Same evaluation harness for n-gram, transformer, and any HF contrast — see
+  the `NextStepModel` protocol in `src/eval/run_eval.py`.
 
-- Data-to-decision pipeline is wired.
-- Metrics are visible and reproducible.
-- The decision is explainable, not a black box.
-- The app remains usable when real data replaces mock data.
-
-## What judges should care about
-
-- early warning usefulness
-- anomaly/bottleneck detection quality
-- process explanation trace
-- robust real-data baseline
-
-## Tomorrow upgrade path
-
-Map real process logs to run_id + step/time + telemetry features, then run the baseline before adding sequence models.
+## Honest limitations
+- Greedy completion has 0% exact match → beam + transformer next.
+- Rule attribution 0.667 reflects multi-rule sequences; not a model bug.
 
 ## Pitch line
-
-“We came with a tested scaffold, replaced synthetic data with the official case data, established a reproducible baseline, then improved the decision layer where it mattered most.”
+"We trained a model that actually learns process logic, evaluated it on the
+official dev split with the official rule validator, and shipped a demo that
+explains every prediction it makes."
