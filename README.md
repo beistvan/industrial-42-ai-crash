@@ -1,19 +1,44 @@
 # Industrial: Models that learn how processes unfold
 
-Train a sequence model that learns industrial process trajectories and predicts the next states, bottlenecks, or anomalies.
+> Infineon track (Zero/One Hack) — sequence model that learns semiconductor
+> fabrication process trajectories and predicts next-step, sequence
+> completion, and rule-violation anomalies.
 
-## Track
-Infineon — industrial process sequences, transformers/hybrids
+**START HERE.** This README is the single operating path for this track.
 
-## 36-hour target
-Build a reliable MVP with:
-- data loader;
-- baseline model;
-- improved model or orchestration layer;
-- evaluation report;
-- demo UI;
-- pitch-ready story;
-- one-command run path.
+## What the task actually is
+
+Given long sequences of semiconductor fabrication steps (MOSFET / IGBT / IC,
+107–151 steps per sequence, ~120-token vocabulary), train a model that can:
+
+1. **Task 1 — Next-step prediction:** given a partial sequence, return the
+   top-k most likely next step tokens (Top-1 / Top-3 / Top-5 / MRR).
+2. **Task 2 — Sequence completion:** given a 60% or 80% prefix, complete the
+   sequence to `SHIP LOT` (exact match, token accuracy, edit distance).
+3. **Task 3 — Anomaly detection:** classify a full sequence as valid or
+   rule-violating, and attribute the violated rule (binary F1 + rule
+   attribution).
+
+A hidden 4th product family is used by the organizers post-submission for
+out-of-distribution generalization scoring (Task 4).
+
+## Authoritative files
+
+For execution during the hackathon, read these in order:
+
+1. `README.md` — this file (one-command path + current numbers).
+2. `docs/PIPELINE.md` — split → train → validate → improve → review loop.
+3. `docs/DATA_SPEC.md` — real Infineon data contract.
+4. `docs/implementation-plan-en.md` — full strategic plan (Hungarian
+   original at `docs/implementation-plan-hu.md`).
+5. `docs/FINETUNE_OPTION_REVIEW.md` — why we are not leading with a
+   HuggingFace pretrained fine-tune.
+6. `docs/LEONARDO_ONBOARDING.md` — AI:AT HPC access checklist (phase 2).
+7. `artifacts/ngram_metrics.json` — latest baseline evidence.
+
+Older planning docs (`AGENTS.md`, `MEMORY.md`, `RULES.md`, `SKILLS.md`,
+`docs/APP_BLUEPRINT.md`, `docs/GPU_COMPUTE_PLAN.md`,
+`docs/LLM_ORCHESTRATION_FOR_THIS_REPO.md`) are reference only.
 
 ## Quickstart
 
@@ -21,115 +46,60 @@ Build a reliable MVP with:
 python -m venv .venv
 source .venv/bin/activate  # Windows PowerShell: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-make test
-make run-demo
+
+python scripts/make_dev_split.py --dev-per-family 100
+python scripts/train_ngram.py    --max-order 8
+streamlit run src/app/eval_dashboard.py
 ```
 
-## Core idea
-Transformer encoder/decoder, TimesNet/PatchTST, or hybrid temporal model with anomaly head
+Three commands give you:
+1. a deterministic train/dev split under `data/processed/`,
+2. a fitted n-gram baseline at `models/ngram_baseline.pkl` + metrics at
+   `artifacts/ngram_metrics.json` + a per-run snapshot at
+   `artifacts/runs/`,
+3. a live Streamlit dashboard with Task 1/2/3 metrics, per-family
+   breakdown, and run history charts.
 
-## Demo UI
-Streamlit process replay: timeline, predicted next state, anomaly score, bottleneck root-cause candidates
+## Current baseline state (n-gram, max_order=8, 50 dev/family, n=300)
 
-## Dataset plan
-NASA turbofan, SECOM manufacturing, semiconductor process logs if provided, synthetic event logs
+| Task | Metric | Overall |
+| --- | --- | ---: |
+| 1 | Top-1 | **0.683** |
+| 1 | Top-5 | **0.990** |
+| 1 | MRR | **0.834** |
+| 2 | Token accuracy | 0.419 |
+| 2 | Normalized edit distance | 0.227 |
+| 3 | F1 (invalid) | **1.000** |
+| 3 | Rule attribution | 0.633 |
 
-## Main evaluation
-Next-step prediction accuracy/MAE, anomaly F1/AUC, early warning lead time, robust performance under noise
+Task 3 perfect F1 is the upper bound from using the official rule validator
+directly. Re-run `python scripts/train_ngram.py --max-order N` with
+different orders to see the dashboard's improvement trend.
 
-## Files to read first
-- `CLAUDE.md`
-- `AGENTS.md`
-- `docs/PRE_HACK_CHECKLIST.md`
-- `docs/TASK_BOARD.md`
-- `docs/DEMO_SPEC.md`
-- `docs/PITCH_SCRIPT.md`
+## Next phases
 
+| Phase | Status | Owner |
+| --- | --- | --- |
+| Vendor official Infineon data | done (PR #1) | — |
+| N-gram baseline + dev split + evaluator + tests | done (PR #2) | — |
+| Eval dashboard + run history | done (PR #3) | — |
+| Independent evaluator | placeholder at `src/eval/local_eval.py` | friend |
+| Small from-scratch transformer | placeholder at `src/ml/transformer_model.py` + `scripts/train_transformer.py` | next |
+| Leonardo HPC access | doc'd at `docs/LEONARDO_ONBOARDING.md` | per-person |
+| One contrast HF fine-tune (`distilgpt2`) | optional, see `docs/FINETUNE_OPTION_REVIEW.md` | stretch |
 
-## Pre-hack mock-data smoke test
+## What NOT to do
 
-No sponsor data is available before the real case reveal, so this repo includes a synthetic mock-data generator.
-
-Run:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows PowerShell: .venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-make smoke
-```
-
-Expected output: a generated file in `data/raw/`, a baseline metrics file at `artifacts/metrics.json`, and passing pytest tests.
-
----
-
-# Industrial: Models that learn how processes unfold
-
-**START HERE. This README is the single operating path for this track.**
-
-Goal: predict process state, bottleneck risk, or anomaly from process telemetry.
-
-## Authoritative files only
-
-Use these files for hackathon execution and ignore older scattered instruction files unless a maintainer explicitly asks for them:
-
-1. `README.md` — this start page and one-command path.
-2. `docs/PRE_HACK_CHECKLIST.md` — readiness checklist before the track reveal.
-3. `docs/TASK_BOARD.md` — what to do now, tomorrow, and during demo prep.
-4. `docs/DEMO_SPEC.md` — what the Streamlit app must show.
-5. `docs/JUDGE_CARD.md` — pitch/judging story.
-6. `artifacts/metrics.json` — latest baseline evidence.
-
-Do **not** spend time reconciling `AGENTS.md`, `CLAUDE.md`, `MEMORY.md`, `RULES.md`, `SKILLS.md`, old orchestration packs, or extra planning docs during the hackathon. Treat them as background/reference only.
-
-## Current baseline state
-
-- Rows: `2400`
-- Accuracy: `0.9983`
-- F1 anomaly: `0.9934`
-- Baseline: RandomForest anomaly classifier on synthetic process-sequence telemetry
-
-## One-command path
-
-```bash
-make smoke
-make test
-make run-demo
-```
-
-Expected result:
-
-- mock data exists in `data/raw/`;
-- baseline evidence exists in `artifacts/metrics.json`;
-- tests pass;
-- Streamlit demo opens at `http://localhost:8501`.
-
-## Demo app
-
-```bash
-make run-demo
-```
-
-The demo currently shows: process scenario input -> normal/watch/anomaly decision -> expected next step -> confidence/explanation -> metric evidence -> data preview.
-
-## Tomorrow after case reveal
-
-1. Save the real brief in `docs/REAL_BRIEF.md`.
-2. Put real data in `data/raw/`.
-3. Inspect columns, target, missingness, row count, and examples.
-4. Map real data into the existing baseline pipeline.
-5. Run `make smoke` and fix the baseline on real data.
-6. Only after baseline works, improve model/policy/prompting.
-7. Keep the demo wired at all times.
-
-Real-data mapping priorities:
-
-- run/process identifier
-- step/order/time column
-- sensor or state variables
-- anomaly/failure/bottleneck target if available
-- next-step or quality outcome if available
+- Do not build a RAG / LLM chatbot.
+- Do not commit any credential, SSH key, certificate, Leonardo link, or
+  Discord invite.
+- Do not start cluster training before the local pipeline (n-gram + dev
+  eval + dashboard) is green.
+- Do not delete or "fix" the mock pipeline files (`scripts/generate_mock_data.py`,
+  `src/ml/baseline.py`, `artifacts/metrics.json`) without a plan — they are
+  historical context, not load-bearing.
 
 ## Stop rule
 
-Once this track is selected, stop touching the other two track repos. If this track is not selected, leave it frozen.
+Once this track is selected at kickoff, stop touching the other two track
+repos. If this track is not selected, leave it frozen.
