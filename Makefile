@@ -24,3 +24,19 @@ smoke: setup
 	$(PYTHON) src/ml/baseline.py
 	$(PYTHON) -m pytest -q
 	$(PYTHON) scripts/smoke_test.py
+
+dev-split:
+	$(PYTHON) scripts/make_dev_split.py --force
+
+train-ngram:
+	$(PYTHON) scripts/train_ngram.py
+
+local-eval:
+	$(PYTHON) src/eval/local_eval.py
+
+predict-dev:
+	$(PYTHON) scripts/predict_submission.py \
+		--model models/ngram_baseline.pkl \
+		--eval-valid data/processed/dev_eval/eval_input_valid_dev.csv \
+		--eval-anomaly data/processed/dev_eval/eval_input_anomaly_dev.csv \
+		--out-dir extras/results
