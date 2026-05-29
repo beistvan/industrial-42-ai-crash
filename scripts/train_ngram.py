@@ -69,7 +69,11 @@ def main() -> None:
     t0 = time.time()
     metrics = evaluate_all(model, args.eval_dir)
     eval_seconds = time.time() - t0
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     payload = {
+        "run_id": f"{timestamp}_ngram_max{args.max_order}",
+        "timestamp": timestamp,
         "model": model.stats(),
         "fit_seconds": round(fit_seconds, 2),
         "eval_seconds": round(eval_seconds, 2),
@@ -77,7 +81,13 @@ def main() -> None:
     }
     args.metrics_path.parent.mkdir(parents=True, exist_ok=True)
     args.metrics_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    # Snapshot per-run so the dashboard can show improvement over time.
+    runs_dir = args.metrics_path.parent / "runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    (runs_dir / f"{payload['run_id']}.json").write_text(
+        json.dumps(payload, indent=2), encoding="utf-8")
     print(f"\nMetrics ({eval_seconds:.1f}s) -> {args.metrics_path}")
+    print(f"Snapshot               -> {runs_dir / (payload['run_id'] + '.json')}")
     print(json.dumps(metrics.to_dict(), indent=2))
 
 
