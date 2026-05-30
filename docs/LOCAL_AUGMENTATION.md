@@ -35,11 +35,21 @@ N-gram with extra data:
 make train-ngram-extra
 ```
 
-Transformer local one-epoch CPU run with extra data:
+Transformer quick wiring check with extra data:
+
+```bash
+make train-transformer-extra-smoke
+```
+
+Transformer local one-epoch CPU run with all generated extra data:
 
 ```bash
 make train-transformer-small-extra-local
 ```
+
+The extra smoke target deliberately caps generated extras with
+`--limit-extra-sequences 2` so it proves the code path works without turning a
+CPU laptop into a long training run.
 
 The generated sequences are **only added to training**. The dev split and dev
 truth stay fixed, so metrics remain comparable across baseline, Transformer,

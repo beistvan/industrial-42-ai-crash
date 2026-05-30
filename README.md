@@ -29,13 +29,11 @@ For execution during the hackathon, read these in order:
 1. `README.md` — this file (one-command path + current numbers).
 2. `docs/PIPELINE.md` — split → train → validate → improve → review loop.
 3. `docs/DATA_SPEC.md` — real Infineon data contract.
-4. `docs/implementation-plan-en.md` — full strategic plan (Hungarian
-   original at `docs/implementation-plan-hu.md`).
-5. `docs/FINETUNE_OPTION_REVIEW.md` — why we are not leading with a
-   HuggingFace pretrained fine-tune.
-6. `docs/LEONARDO_ONBOARDING.md` — AI:AT HPC access checklist (phase 2).
-7. `docs/TRANSFORMER_MODEL.md` — compact decoder-only Transformer usage.
-8. `docs/LOCAL_AUGMENTATION.md` — local Step 6 data generation / augmentation.
+4. `docs/METRICS_INTERPRETATION.md` — how to explain the current dashboard numbers.
+5. `docs/TRANSFORMER_MODEL.md` — compact decoder-only Transformer usage.
+6. `docs/LOCAL_AUGMENTATION.md` — local Step 6 data generation / augmentation.
+7. `docs/LEONARDO_ONBOARDING.md` — AI:AT HPC access checklist (phase 2).
+8. `docs/implementation-plan-en.md` — full strategic plan (Hungarian original at `docs/implementation-plan-hu.md`).
 9. `artifacts/ngram_metrics.json` — latest baseline evidence.
 
 Older planning docs (`AGENTS.md`, `MEMORY.md`, `RULES.md`, `SKILLS.md`,
@@ -47,58 +45,102 @@ reference only.
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # Windows PowerShell: .venv\Scripts\Activate.ps1
-pip install -r requirements.txt
 
-make smoke              # dev split + n-gram train + tests + smoke check
+# Base pipeline + CPU PyTorch for the step-5 Transformer smoke path.
+make setup-cpu
+
+make smoke              # dev split + n-gram train + no-skip tests + smoke check
 make run-demo           # Streamlit demo (n-gram or Transformer, Task 1/2/3 + audit trace)
 make run-dashboard      # Streamlit run-history dashboard
 
-# Optional local Transformer path, CPU-safe smoke first:
+# Local Transformer path, GPU-free but requires CPU PyTorch:
 make train-transformer-smoke
 make train-transformer-small-local
 
-# Optional Step 6 local augmentation, still GPU-free:
+# Step 6 local augmentation, still GPU-free:
 make generate-extra-local
 make train-ngram-extra
+make train-transformer-extra-smoke
 make train-transformer-small-extra-local
 ```
 
+If `train_transformer.py` says PyTorch is missing, run:
+
+```bash
+make setup-cpu
+```
+
+On Leonardo/GPU, do not use the CPU wheel command; install the CUDA-enabled
+PyTorch build according to the HPC environment docs.
+
 `make smoke` produces:
+
 1. a deterministic train/dev split under `data/processed/`,
 2. a fitted n-gram baseline at `models/ngram_baseline.pkl` + metrics at
    `artifacts/ngram_metrics.json` + a per-run snapshot at `artifacts/runs/`,
-3. 20 passing pytests and a smoke check that the real-data pipeline is wired.
+3. 26 passing pytests with **0 skipped** when PyTorch is installed,
+4. a smoke report proving the real-data pipeline is wired.
 
 `make run-demo` reads those artifacts and shows Task 1/2/3 headline numbers,
 per-family breakdown, a live next-step demo, an explanation of the active model,
 and a full audit trace. The sidebar can switch between `models/ngram_baseline.pkl`
 and any available `models/transformer_*.pt` checkpoint.
 
-## Current baseline state (n-gram, max_order=8, 50 dev/family, n=300)
+## Current local baseline state
+
+Typical current run after:
+
+```bash
+make dev-split
+make train-ngram
+```
 
 | Task | Metric | Overall |
 | --- | --- | ---: |
-| 1 | Top-1 | **0.683** |
-| 1 | Top-5 | **0.990** |
-| 1 | MRR | **0.834** |
-| 2 | Token accuracy | 0.419 |
-| 2 | Normalized edit distance | 0.227 |
+| 1 | Top-1 | **~0.687** |
+| 1 | Top-3 | **~0.928** |
+| 1 | Top-5 | **~0.928** |
+| 1 | MRR | **~0.807** |
+| 2 | Token accuracy | ~0.421 |
+| 2 | Normalized edit distance | ~0.224 |
 | 3 | F1 (invalid) | **1.000** |
-| 3 | Rule attribution | 0.633 |
+| 3 | Rule attribution | ~0.690 |
 
-Task 3 perfect F1 is the upper bound from using the official rule validator
-directly. Re-run `python scripts/train_ngram.py --max-order N` with
-different orders to see the dashboard's improvement trend.
+Task 3 perfect F1 is expected for this local dev set: invalid examples are
+injected rule violations and the detector calls the official Infineon rule
+validator. This is not claiming that the n-gram learned anomaly detection; it is
+claiming that the system separates learned route distribution from hard
+manufacturing invariants. See `docs/METRICS_INTERPRETATION.md`.
+
+## Subject fit / judge story
+
+The repo now matches the selected Industrial/Infineon subject:
+
+- **Task 1/2:** n-gram suffix baseline plus a compact family-conditioned
+  decoder-only Transformer interface.
+- **Task 3:** official process-rule validator for deterministic anomaly
+  detection and rule attribution.
+- **Step 5:** small Transformer implemented locally with CPU smoke and small-run
+  targets; Leonardo/GPU only needed for larger training.
+- **Step 6:** generated valid-route augmentation is available locally and uses
+  the same training/eval split for comparable metrics.
+
+Pitch sentence:
+
+> We compare a memorization-prone n-gram baseline against a trained
+> family-conditioned Transformer, then constrain anomaly judgment with explicit
+> process rules. This separates learned sequence distribution from hard
+> manufacturing invariants.
 
 ## Next phases
 
 | Phase | Status | Owner |
 | --- | --- | --- |
-| Vendor official Infineon data | done (PR #1) | — |
-| N-gram baseline + dev split + evaluator + tests | done (PR #2) | — |
-| Eval dashboard + run history | done (PR #3) | — |
+| Vendor official Infineon data | done | — |
+| N-gram baseline + dev split + evaluator + tests | done | — |
+| Eval dashboard + run history | done | — |
 | Independent evaluator | done, shared model loader | `src/eval/local_eval.py` |
-| Small from-scratch transformer | local CPU/smoke implementation done | `src/ml/transformer_model.py`, `scripts/train_transformer.py` |
+| Small from-scratch Transformer | local CPU/smoke implementation done | `src/ml/transformer_model.py`, `scripts/train_transformer.py` |
 | Local generated-data augmentation | done for CPU/local prep | `scripts/generate_extra_sequences.py` |
 | Leonardo HPC access | doc'd at `docs/LEONARDO_ONBOARDING.md` | per-person |
 | One contrast HF fine-tune (`distilgpt2`) | optional, see `docs/FINETUNE_OPTION_REVIEW.md` | stretch |
