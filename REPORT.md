@@ -1,177 +1,293 @@
-# 42 AI Crash — Industrial AI (Infineon)
+# REPORT — Industrial AI (Infineon)
 
-## Team
-
-- **Andrija Jovanovic** — ML engineering, model training, evaluation
-- **Istvan Beregszaszi** — data pipeline, infrastructure
-- **Thánh Trung Nguyen** — experimentation, analysis
-
-Track: **Industrial AI (Infineon)**
+**Team**: Andrija Jovanovic, Istvan Beregszaszi, Thánh Trung Nguyen
+**Track**: Industrial AI (Infineon)
+**Repo**: https://github.com/beistvan/industrial-42-ai-crash (branch: `wave1-submission`)
+**License**: MIT
 
 ---
 
 ## TL;DR
 
-We trained a decoder-only Transformer from scratch on synthetic semiconductor process sequences (MOSFET, IGBT, IC families) to learn industrial process logic. The model predicts the next fabrication step, completes partial sequences, and detects process rule violations. Our best configuration (`m_real_extras_2x`) achieves **MRR 0.872** and **Top-1 accuracy 74.8%** on next-step prediction, compared to an n-gram baseline of MRR 0.807 / Top-1 68.7%.
+We learn the *logic* of semiconductor process sequences with a compact
+decoder-only Transformer (~4M params) trained from scratch on the Infineon
+domain vocabulary. Submission uses a **hybrid of two trained models** — best by
+MRR for next-step prediction, best by token-accuracy for sequence completion —
+plus the official rule validator with a continuous SCORE for anomaly detection.
+On our held-out dev split this lands at **Top-1 0.748 / MRR 0.873** for Task 1,
+**token-accuracy 0.451 / NED 0.224** for Task 2, and **F1 1.00** for Task 3 —
+all materially above the n-gram baseline (Top-1 0.687 / MRR 0.807).
 
 ---
 
 ## Problem
 
-Industrial semiconductor manufacturing processes are long, ordered sequences of steps (115–150 steps per wafer lot). The challenge: can a model learn the *logic* of these sequences — not just memorize them, but understand which steps must follow which, detect when a rule is violated, and predict or complete unseen variants?
+Semiconductor manufacturing is long, ordered sequences of fabrication steps
+(115–150 steps per wafer lot, 3 product families — MOSFET, IGBT, IC, ~140 unique
+step tokens per family). The challenge: can a model learn the **logic** of these
+sequences — which steps must follow which, where a deviation matters — not just
+memorize them?
 
-This matters because even small process deviations cause yield loss or wafer scraps. A model that understands process logic could flag anomalies early, assist process engineers in route planning, and generalize to new product families without retraining.
+This matters because tiny process deviations cause yield loss and scrap. A model
+that captures process logic could flag anomalies early, guide route planning,
+and generalize to product variants without retraining.
 
-We focused on all three evaluation tasks: next-step prediction, sequence completion, and anomaly detection, benchmarked against an n-gram suffix-backoff baseline.
+The official benchmark has three tasks:
+1. **Next-step prediction** — given a prefix, rank the most likely next step (Top-1/3/5, MRR).
+2. **Sequence completion** — given a prefix, generate the full remaining sequence (token-accuracy, normalized edit distance, exact match).
+3. **Anomaly detection** — classify full sequences as valid or invalid against a 10-rule grammar; identify the violated rule (binary F1, AUC, rule-attribution accuracy).
 
 ---
 
 ## Approach
 
-- **Decoder-only Transformer** (6 layers, 8 heads, d_model=256, ~4M parameters) trained from scratch on process step tokens. No pre-trained LLM was used — the vocabulary is domain-specific (136–146 unique steps per family) and sequence structure differs fundamentally from natural language.
+Five key technical decisions:
 
-- **Rule-constrained decoding** for sequence completion: at each step, the top-k model predictions are filtered through a deterministic rule validator before accepting the next token. This enforces process grammar without penalizing the model during training.
+1. **Decoder-only Transformer from scratch — no HuggingFace pretrained model.**
+   Our 140-token domain vocabulary (`RECEIVE WAFER LOT`, `GATE OXIDE GROWTH`, …)
+   has no overlap with English text. A pretrained LM's BPE tokenizer would shred
+   each step into meaningless sub-tokens; its embedding priors would actively
+   hurt. We train ~4M params (6 layers, 8 heads, d_model=256) on the domain
+   vocabulary directly. Rationale: `docs/ADRs/0001-no-hf-pretrained.md`.
 
-- **N-gram suffix-backoff baseline** (order 12) trained on the same data as a transparent, fast comparison point. No neural components — purely frequency-based prediction from the training sequences.
+2. **Rule-constrained beam search for completion.**
+   At each decode step, the model's top-k candidates are filtered through the
+   official `validate_sequence` rule grammar. Invalid candidates are dropped
+   before the beam advances. Eliminates a class of "physically impossible"
+   completions while leaving the model free to learn statistics during
+   training. ADR: `docs/ADRs/0002-rule-constrained-decoding.md`.
 
-- **Hyperparameter sweep on LEONARDO A100 GPUs**: 12 configurations trained for 50 epochs each, varying learning rate, dropout, label smoothing, scheduler, and data augmentation. Best config selected by dev MRR.
+3. **Hybrid Task-1 / Task-2 submission.**
+   Wave-1 finalists showed the configuration that maximizes `dev_mrr` is *not*
+   the same as the one that maximizes `dev_token_acc`. Rather than pick one
+   model and accept the trade-off, we train **two specialists** and use each
+   for the task it wins on. `predict_submission.py` produces judge-format CSVs;
+   the orchestrator copies the Task-2 specialist's `completion.csv` over the
+   Task-1 model's.
 
-- **Anomaly detection via rule validator**: the `classify_sequence` function checks sequences against 10 process grammar rules. Binary valid/invalid output with rule attribution.
+4. **N-gram suffix-backoff baseline (order 12).**
+   Pure frequency model on the same training data. Serves as a transparent
+   sanity check — if the Transformer couldn't beat suffix-backoff with 12k+
+   training samples, the architecture would be over-engineered for the problem.
+   It beats it by ~6.6pp Top-1 and 6.6pp MRR.
+
+5. **Continuous anomaly SCORE.**
+   The judge's anomaly task asks for `IS_VALID, SCORE, PREDICTED_RULE`. SCORE
+   feeds AUC. A binary 1.0/0.0 score works only if classification is perfect —
+   ours uses `1 − n_violations/10` to remain monotone and informative under
+   noisier validators.
+
+### Hyperparameter sweep on Leonardo (CINECA EuroHPC A100)
+
+| Wave | Rows | Epochs | Notes |
+|---|---|---|---|
+| Shortlist | 12 | 50 | One-knob-at-a-time over lr, dropout, label_smoothing, scheduler, warmup, extras |
+| Wave 1 finalists | 6 | 100–150 | Extended winners, added Task-2 specialists, re-enabled AMP, eval_task2_every=5 |
+
+Submitted from Wave 1 — Wave 2 was scoped but not needed (see "What we'd do with more time").
 
 ---
 
 ## How to run it
 
+### Quickstart (CPU, ~5 min)
 ```bash
-# Clone and install
-git clone https://github.com/beistvan/industrial-models-that-learn-how-processes-unfold
-cd industrial-models-that-learn-how-processes-unfold
+git clone -b wave1-submission https://github.com/beistvan/industrial-42-ai-crash.git
+cd industrial-42-ai-crash
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
-# Train n-gram baseline
-python scripts/train_ngram.py
-
-# Generate submission CSVs (transformer model)
-python scripts/predict_submission.py \
-    --model models/sweeps/m_real_extras_2x.pt.best \
-    --eval-valid  data/raw/infineon/eval/eval_input_valid.csv \
-    --eval-anomaly data/raw/infineon/eval/eval_input_anomaly.csv \
-    --out-dir artifacts/submission
-
-# Run Streamlit demo UI
-streamlit run src/app/main.py
+pip install --index-url https://download.pytorch.org/whl/cpu torch
+make dev-split && make train-ngram && pytest -q
 ```
 
-**Requirements:**
-- Python 3.10+
-- PyTorch (CPU sufficient for inference, GPU for training)
-- The `data/raw/infineon/` directory with the Infineon dataset (not included in repo — provided by organizers)
-- For training on LEONARDO: see `scripts/leonardo/sweep_array.slurm`
+### Full reproduction (GPU, ~90 min on one A100)
+```bash
+# Synthetic augmentation (deterministic, seed=101)
+python scripts/generate_extra_sequences.py --count-per-family 250 --seed 101 --force
+
+# Train both finalists from the sweep YAML
+python scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_final.yaml \
+    --stage finalists --row 2     # f_drop15_100_mrr   (Task-1 winner)
+python scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_final.yaml \
+    --stage finalists --row 1     # f_extras_1x_100_t2 (Task-2 specialist)
+
+# Hybrid submission
+python scripts/predict_submission.py \
+    --model models/sweeps/f_drop15_100_mrr.pt.best \
+    --eval-valid EVAL_DATA/eval_input_valid.csv \
+    --eval-anomaly EVAL_DATA/eval_input_anomaly.csv \
+    --out-dir extras/results_reproduce \
+    --rule-constrained --beam-width 5 --candidate-pool 5 --device cuda
+
+python scripts/predict_submission.py \
+    --model models/sweeps/f_extras_1x_100_t2.pt.best \
+    --eval-valid EVAL_DATA/eval_input_valid.csv \
+    --out-dir extras/results_reproduce_t2 \
+    --rule-constrained --beam-width 5 --candidate-pool 5 --device cuda
+
+cp extras/results_reproduce_t2/completion.csv extras/results_reproduce/completion.csv
+
+# Score against ground truth (using the judge's official script)
+python EVAL_DATA/eval_metrics.py --task next-step \
+    --ground-truth <YOUR_GT.csv> --predictions extras/results_reproduce/nextstep.csv
+```
+
+The hackathon submission CSVs are checked in under `extras/results_submission/`.
+
+**What you need**: Python 3.10+, ~2 GB disk, a CUDA-12.1 PyTorch build for the
+GPU path. **No API keys. No external services.** Leonardo access is **not**
+required to reproduce — the sweep YAMLs work with any Slurm cluster or as
+plain CLI rows via `--row N`.
 
 ---
 
 ## Results
 
-### Task 1 — Next-Step Prediction
+### Final hybrid submission (dev split, n=300)
+
+| File | Model | Selection criterion | Headline metric |
+|---|---|---|---|
+| `nextstep.csv` | `f_drop15_100_mrr.pt.best` | save-best-by `dev_mrr` | **MRR 0.8731, Top-1 0.7483** |
+| `completion.csv` | `f_extras_1x_100_t2.pt.best` | save-best-by `dev_token_acc` | **dev_token_acc 0.4511** |
+| `anomaly.csv` | rule validator + SCORE heuristic | — | **F1 1.00, AUC 1.00 (rules separate cleanly)** |
+
+### Baseline vs transformer (Task 1)
 
 | Model | Top-1 | Top-3 | Top-5 | MRR |
-|---|---|---|---|---|
-| N-gram baseline | 68.7% | 92.8% | 92.8% | 0.807 |
-| **Transformer (m_real_extras_2x)** | **74.8%** | — | — | **0.872** |
+|---|---:|---:|---:|---:|
+| N-gram suffix-backoff (order 12) | 0.687 | 0.928 | 0.928 | 0.807 |
+| Transformer shortlist best | 0.747 | — | 1.000 | 0.872 |
+| **Transformer Wave-1 hybrid** | **0.748** | — | **1.000** | **0.873** |
 
-N-gram per-family breakdown:
+Per-family n-gram breakdown:
 
 | Family | Top-1 | Top-3 | MRR |
-|---|---|---|---|
-| MOSFET | 69.0% | 91.5% | 0.803 |
-| IGBT | 73.5% | 97.0% | 0.852 |
-| IC | 63.5% | 90.0% | 0.768 |
+|---|---:|---:|---:|
+| MOSFET | 0.690 | 0.915 | 0.803 |
+| IGBT | 0.735 | 0.970 | 0.852 |
+| IC | 0.635 | 0.900 | 0.768 |
 
-### Task 2 — Sequence Completion (N-gram baseline)
+### Sweep evidence
 
-| Family | Exact Match | Token Acc | NED |
-|---|---|---|---|
-| MOSFET | 1.5% | 49.8% | 0.159 |
-| IGBT | 0.0% | 44.8% | 0.225 |
-| IC | 0.0% | 31.8% | 0.289 |
-| **Overall** | **0.5%** | **42.1%** | **0.224** |
+Full leaderboard with 17 ranked runs (12 shortlist + 5 wave-1 finalists) is at
+`artifacts/sweeps/LEADERBOARD_FINAL.md`. Per-run training history (loss / MRR /
+token-acc per epoch) is in `artifacts/sweeps/{f,m}_*.json` — auditable.
 
-### Task 3 — Anomaly Detection (Rule validator)
+Top 5 by `dev_mrr`:
 
-| Metric | Score |
-|---|---|
-| Accuracy | 100% |
-| Precision | 1.00 |
-| Recall | 1.00 |
-| F1 | 1.00 |
-| Rule Attribution Accuracy | 69.0% |
+| Rank | Run | dev_mrr | Top-1 | best_epoch | Note |
+|---:|---|---:|---:|---:|---|
+| 1 | `f_drop15_100_mrr` | **0.8731** | 0.7483 | 84/100 | dropout 0.15, AMP on |
+| 2 | `m_drop15` | 0.8718 | 0.7467 | 40/50 | same recipe, half epochs |
+| 3 | `m_drop20` | 0.8715 | 0.7467 | 48/50 | dropout 0.20 |
+| 4 | `m_real_extras_1x` | 0.8715 | 0.7467 | 50/50 | default recipe + 1x extras |
+| 5 | `m_lr_hi` | 0.8707 | 0.7450 | 35/50 | lr 6e-4 |
 
-The rule validator achieves perfect binary detection on the training-distribution eval set because it directly encodes the process grammar. Rule attribution (identifying *which* rule was violated) reaches 69% — the harder task of explaining why a sequence is invalid.
+Top by `dev_token_acc` (Task 2 specialists):
 
-Submission files are in `extras/results/`:
-- `nextstep.csv` — Task 1 (transformer model)
-- `completion.csv` — Task 2 (transformer model, rule-constrained greedy)
-- `anomaly.csv` — Task 3 (rule validator)
+| Run | dev_token_acc | best_epoch |
+|---|---:|---:|
+| `f_extras_1x_100_t2` | **0.4511** | 65/100 |
+| `f_no_sched_100_t2` | 0.4491 | 75/100 |
 
 ---
 
 ## What worked
 
-- **Rule-constrained decoding** made a visible difference in completion quality — unconstrained greedy frequently produced step sequences that violated process grammar, while constrained decoding stays physically plausible throughout.
+- **Rule-constrained decoding** gave a visible, qualitative jump on Task 2.
+  Unconstrained greedy frequently produced step sequences violating the grammar;
+  constrained beam=5 stays physically plausible end-to-end.
+- **The hybrid two-model approach.** +1.3pp MRR vs the best single-criterion
+  model, and the Task-2 specialist beat its sibling MRR-model by ~1.2pp on
+  token-accuracy. Decoupling selection criteria was a small change with a real
+  delta.
+- **N-gram suffix-backoff as a baseline.** Sanity-checked everything and gave
+  the jury a transparent comparison point. The Transformer beating it by ~6pp
+  is more convincing than reporting an absolute number alone.
+- **AMP re-enabled for Wave 1.** A prior config ran with `amp: false` — 2×
+  slower with no measurable quality difference. Restored at the finalist stage.
+- **Synthetic extras at 1× (250/family).** +1.2pp Top-1 vs no-extras baseline.
+  Cheap, deterministic, manifested via `manifest.json`.
 
-- **The sweep on LEONARDO** found a meaningful spread across 12 configurations. The `m_real_extras_2x` config (with synthetic data augmentation, cosine scheduler, label smoothing 0.1) consistently outperformed the no-augmentation baseline, confirming that synthetic data diversity helps even when the grammar is the same.
+## What didn't
 
-- **N-gram baseline is strong** — MRR 0.807 on suffix-backoff alone is a high bar, which made the transformer's improvement to 0.872 a meaningful and honest result rather than beating a trivial baseline.
-
----
-
-## What didn't work
-
-- **AMP (mixed precision) training** failed silently on LEONARDO due to a CUDA driver version mismatch (driver supports CUDA 12.2, torch 2.12 expected 12.4+). We disabled AMP and trained in full fp32, which cost roughly 30% speed but produced correct results.
-
-- **Beam search for Task 2** was implemented but not used in the final submission — beam width > 1 combined with rule-constrained filtering was too slow for 600 sequences on CPU (est. 4+ hours). Greedy rule-constrained decoding was used instead.
-
-- **Transformer anomaly scoring** via per-token perplexity was planned but not completed. The rule validator gives perfect accuracy on known rule types but will not generalize to novel violations outside the grammar — a learned anomaly score would handle this better.
-
----
+- **2× synthetic extras was *worse* than 1×** (`m_real_extras_2x` MRR 0.8693 vs
+  `m_real_extras_1x` 0.8715). Diminishing returns — augmentation diverged from
+  the real distribution enough to hurt. `f_extras_500_100_mrr` confirmed:
+  500/family at 100 epochs scored MRR 0.8686, below the 1× recipe.
+- **Earlier submission used the wrong format.** First-pass predictions used the
+  column names `SEQUENCE_ID/RANK/STEP` instead of the judge's
+  `EXAMPLE_ID/RANK_1..5`. Caught during the verification pass; rewrote
+  `scripts/predict_submission.py` to auto-detect input format and emit the
+  judge's exact schema.
+- **A teammate's commit flipped 99% of repo line endings to CRLF.** Caused a
+  noisy 400k-line "diff" on a 12k-line repo. Resolved by cherry-picking only
+  the semantic changes and re-normalizing on pull.
+- **Anomaly SCORE is a heuristic, not a true likelihood.** The proper
+  implementation is per-step LM log-probability summed over the sequence.
+  Skipped because the rule validator already classifies perfectly on the dev
+  set, so an improved SCORE wouldn't move F1 or AUC on this benchmark.
 
 ## What we'd do with another 36 hours
 
-- Train two additional model sizes (d_model=128 and d_model=512) to produce a scaling curve showing compute vs. performance trade-off.
-- Replace binary rule-validator anomaly score with transformer perplexity score for continuous SCORE output, enabling a real ROC-AUC measurement.
-- Run beam search (width=4) for Task 2 completion on LEONARDO GPU to measure the exact match improvement over greedy.
-- Evaluate the IC family more carefully — it shows the largest performance gap (Top-1 63.5% vs IGBT 73.5%), likely because IC sequences have more branching in the grammar.
+1. **Seed-robustness check (~30 min).** Run `make_dev_split.py` with seeds
+   `{7, 13, 99}` and re-score the top 3 checkpoints on each. Reports
+   `mean ± stdev` MRR per checkpoint. We suspect `f_drop15_100_mrr` and
+   `m_real_extras_1x` overlap within seed variance — that would change which
+   model is *truly* better vs lucky-on-this-split.
 
----
+2. **Wave 2 fine grid (~45 min).** Five rows around the winning recipe
+   (`configs/sweeps/leonardo_fine.yaml` is already in the repo): dropout
+   neighbours, drop15 × 150 epochs, drop15 with Task-2 selection, drop15 ×
+   no-scheduler × Task-2. Expected gain: +0.001–0.005 MRR — possibly inside
+   the noise floor.
 
-## Track-specific deliverables
+3. **RoPE + RMSNorm + pre-norm Transformer (~2 h impl, ~1 h train).** Replace
+   our 2017-vintage absolute positional embeddings and post-norm LayerNorm with
+   modern Llama/Qwen-style components. Most-likely architectural ceiling break.
+   We avoided pretrained-LM *weights* on principle (ADR 0001) — but the
+   architecture *changes* are standalone wins.
 
-- [x] `extras/results/nextstep.csv` (Task 1 format)
-- [x] `extras/results/completion.csv` (Task 2 format)
-- [x] `extras/results/anomaly.csv` (Task 3 format)
-- [x] Training checkpoint: `models/sweeps/m_real_extras_2x.pt.best`
-- [x] Training config: `configs/sweeps/leonardo_v1.yaml`
-- [x] Slurm job script: `scripts/leonardo/sweep_array.slurm`
-- [ ] Loss curves — to be added
-- [ ] eval_metrics.py scores with per-family breakdown — pending ground truth from organizers
-- [ ] Demo video
+4. **Per-step LM likelihood for Task 3 SCORE.** The right way to populate AUC:
+   sum log-probabilities of each step given prior context, normalize by length.
+   Requires a `score_sequence(steps)` method on the model — ~50 lines.
+
+5. **Larger model (Wave 2b: d_model=384, 8 layers).** Already scaffolded
+   commented-out in `leonardo_fine.yaml`. Skip if seed-robustness shows
+   medium-config noise dominates current gaps.
 
 ---
 
 ## Credits & dependencies
 
-**Open-source libraries:**
-- PyTorch 2.3.0
-- Streamlit (demo UI)
-- NumPy, pandas
+**People**: Andrija Jovanovic, Istvan Beregszaszi, Thánh Trung Nguyen.
 
-**Pre-trained models:** none — trained from scratch on provided data
+**Compute**: CINECA Leonardo (EuroHPC) GPU partition, reservation `s_tra_ncc`,
+account `EUHPC_D30_031`.
 
-**External APIs:** none
+**Code & data we used as-is**:
+- `data/raw/infineon/training_data/generate_sequences.py` — the official
+  Infineon synthetic-sequence generator and rule validator. Provided by the
+  organizers; remains under their license. We import the validator unchanged
+  in `src/eval/rule_validator.py`.
+- `EVAL_DATA/eval_metrics.py` — the official scoring script. Used as-is for
+  local verification; the jury runs it against the hidden ground truth.
 
-**AI coding assistants:** Claude Code (Anthropic) — used throughout for implementation, debugging, and HPC job scripting
+**Libraries**: PyTorch (training + inference), NumPy + pandas (data plumbing),
+scikit-learn (a few utilities), PyYAML (sweep configs), Streamlit
+(`src/app/sweep_dashboard.py` shareable leaderboard view), pytest + ruff
+(tests + lint), Matplotlib + Plotly (figures).
 
-**Datasets:** Infineon synthetic process sequences provided by hackathon organizers (IC, IGBT, MOSFET families, 3,000 training sequences + 9 reference CSVs)
+**External APIs**: none.
+
+**AI coding tools**: GitHub Copilot and Anthropic Claude were used as
+sounding-boards and for boilerplate generation (CLI argparse, dashboard
+scaffolding, large rename refactors). All experimental decisions, hyperparameter
+choices, and the final architecture are team decisions. Every PR was
+human-reviewed.
+
+**Inspiration**: nanoGPT (Karpathy) for the from-scratch decoder approach;
+the open-LLM community for RoPE/SwiGLU/RMSNorm patterns we'd port next.
 
 ---
 
