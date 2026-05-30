@@ -27,18 +27,21 @@ out-of-distribution generalization scoring (Task 4).
 For execution during the hackathon, read these in order:
 
 1. `README.md` — this file (one-command path + current numbers).
-2. `docs/PIPELINE.md` — split → train → validate → improve → review loop.
-3. `docs/DATA_SPEC.md` — real Infineon data contract.
-4. `docs/METRICS_INTERPRETATION.md` — how to explain the current dashboard numbers.
-5. `docs/TRANSFORMER_MODEL.md` — compact decoder-only Transformer usage.
-6. `docs/LOCAL_AUGMENTATION.md` — local Step 6 data generation / augmentation.
-7. `docs/LEONARDO_ONBOARDING.md` — AI:AT HPC access checklist (phase 2).
-8. `docs/implementation-plan-en.md` — full strategic plan (Hungarian original at `docs/implementation-plan-hu.md`).
-9. `artifacts/ngram_metrics.json` — latest baseline evidence.
+2. `docs/TASK_BOARD.md` — what's done, what's next, what's blocked.
+3. `docs/PIPELINE.md` — split → train → validate → improve → review loop.
+4. `docs/DATA_SPEC.md` — real Infineon data contract.
+5. `docs/METRICS_INTERPRETATION.md` — how to explain the dashboard numbers.
+6. `docs/TRANSFORMER_MODEL.md` — compact decoder-only Transformer usage.
+7. `docs/LOCAL_AUGMENTATION.md` — local generated-data augmentation.
+8. `docs/LEONARDO_ONBOARDING.md` — AI:AT HPC access checklist (per person).
+9. `docs/LEONARDO_BATTLE_PLAN.md` — runbook for the HPC sweep stages.
+10. `docs/DEMO_SPEC.md` — Streamlit demo spec (incl. planned shock page).
+11. `docs/implementation-plan-en.md` — full strategic plan (Hungarian original at `docs/implementation-plan-hu.md`).
+12. `artifacts/ngram_metrics.json` — latest baseline evidence.
 
-Older planning docs (`AGENTS.md`, `MEMORY.md`, `RULES.md`, `SKILLS.md`,
-`docs/GPU_COMPUTE_PLAN.md`, `docs/LLM_ORCHESTRATION_FOR_THIS_REPO.md`) are
-reference only.
+Older planning docs (`AGENTS.md`, `MEMORY.md`, `RULES.md`, `SKILLS.md`) are
+reference only. Historical merge/fix notes and superseded specs live in
+`docs/archive/` — see `docs/archive/README.md` for the index.
 
 ## Quickstart
 
