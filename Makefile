@@ -83,12 +83,14 @@ train-transformer-medium: check-torch
 local-eval-transformer: check-torch
 	$(PYTHON) src/eval/local_eval.py --model models/transformer_small.pt --out artifacts/transformer_local_eval_metrics.json
 
+TRANSFORMER_MODEL ?= models/transformer_small.pt
+TRANSFORMER_OUT   ?= extras/results_transformer
 predict-dev-transformer: check-torch
 	$(PYTHON) scripts/predict_submission.py \
-		--model models/transformer_small.pt \
+		--model $(TRANSFORMER_MODEL) \
 		--eval-valid data/processed/dev_eval/eval_input_valid_dev.csv \
 		--eval-anomaly data/processed/dev_eval/eval_input_anomaly_dev.csv \
-		--out-dir extras/results_transformer
+		--out-dir $(TRANSFORMER_OUT)
 
 # Step 6 local-only data augmentation. GPU/Leonardo scaling can use the same files later.
 generate-extra-local:

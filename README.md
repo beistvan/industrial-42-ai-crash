@@ -88,12 +88,11 @@ and any available `models/transformer_*.pt` checkpoint.
 
 ## Current local baseline state
 
-Typical current run after:
-
-```bash
-make dev-split
-make train-ngram
-```
+Typical current run after `make dev-split && make train-ngram`. Dev eval is
+100 sequences per family truncated at 60% / 80% for Tasks 1+2 (→ 200 items/
+family, 600 overall) and 200 full sequences per family for Task 3 (50% valid,
+50% rule-injected). Numbers refresh on every `make train-ngram` in
+`artifacts/ngram_metrics.json`.
 
 | Task | Metric | Overall |
 | --- | --- | ---: |
@@ -105,6 +104,19 @@ make train-ngram
 | 2 | Normalized edit distance | ~0.224 |
 | 3 | F1 (invalid) | **1.000** |
 | 3 | Rule attribution | ~0.690 |
+
+Task 2 supports two decoding modes — toggleable via `--rule-constrained` /
+`--no-rule-constrained` on both `scripts/predict_submission.py` and
+`src/eval/local_eval.py`. **Default is rule-constrained** (top-5 candidates
+filtered against the official `validate_sequence` each step). Empirical note:
+on the n-gram baseline, plain greedy beats rule-constrained by a hair
+(tok_acc 0.428 vs 0.421) because the n-gram learns grammar implicitly from
+real data. We expect rule-constrained to win on the Transformer once trained,
+since it won't be grammar-perfect.
+
+Task 3 `primary_rule` is the rule fired at the smallest `step_index` in the
+sequence (ties broken by rule name) — this is what raised rule attribution
+from ~0.667 to ~0.690.
 
 Task 3 perfect F1 is expected for this local dev set: invalid examples are
 injected rule violations and the detector calls the official Infineon rule
