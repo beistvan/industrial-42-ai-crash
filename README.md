@@ -35,9 +35,12 @@ For execution during the hackathon, read these in order:
 7. `docs/LOCAL_AUGMENTATION.md` — local generated-data augmentation.
 8. `docs/LEONARDO_ONBOARDING.md` — AI:AT HPC access checklist (per person).
 9. `docs/LEONARDO_BATTLE_PLAN.md` — runbook for the HPC sweep stages.
-10. `docs/DEMO_SPEC.md` — Streamlit demo spec (incl. planned shock page).
-11. `docs/implementation-plan-en.md` — full strategic plan (Hungarian original at `docs/implementation-plan-hu.md`).
-12. `artifacts/ngram_metrics.json` — latest baseline evidence.
+10. `docs/TOMORROW_PLAN.md` — companion runbook with decision matrix + comparison checklist.
+11. `docs/MODEL_EXPLORATION.md` — ranked list of "should we try X?" ideas.
+12. `docs/ADRs/` — architectural decisions (no HF pretrained, rule-constrained default, beam-search opt-in).
+13. `docs/DEMO_SPEC.md` — Streamlit demo spec (incl. planned shock page).
+14. `docs/implementation-plan-en.md` — full strategic plan (Hungarian original at `docs/implementation-plan-hu.md`).
+15. `artifacts/ngram_metrics.json` — latest baseline evidence.
 
 Older planning docs (`AGENTS.md`, `MEMORY.md`, `RULES.md`, `SKILLS.md`) are
 reference only. Historical merge/fix notes and superseded specs live in
