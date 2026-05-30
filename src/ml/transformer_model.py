@@ -278,6 +278,31 @@ class TransformerProcessModel:
         token_ids = self._ranked_token_ids(family, prefix, k=k, allow_eos=False)
         return self.vocab.decode(token_ids)
 
+    @torch.no_grad() if torch is not None else (lambda fn: fn)
+    def predict_topk_with_scores(
+        self, family: Family, prefix: list[str], k: int = 5
+    ) -> list[tuple[str, float]]:
+        """Top-k tokens with log-softmax scores (excluding EOS).
+
+        Used by beam search. EOS is allowed inside beam search via the
+        `complete()` path; here we are scoring Task-1-style continuations.
+        """
+        logits = self._next_logits(family, prefix)
+        # Block specials except EOS — beam search wants to choose EOS to stop.
+        for token_id in self._blocked_completion_ids:
+            logits[token_id] = -torch.inf
+        log_probs = torch.log_softmax(logits, dim=-1)
+        ranked = torch.argsort(log_probs, descending=True).tolist()
+        out: list[tuple[str, float]] = []
+        for token_id in ranked:
+            token = self.vocab.id_to_token[token_id]
+            if token == PAD_TOKEN or token == BOS_TOKEN:
+                continue
+            out.append((token, float(log_probs[token_id])))
+            if len(out) >= k:
+                break
+        return out
+
     def complete(
         self,
         family: Family,
@@ -285,16 +310,70 @@ class TransformerProcessModel:
         *,
         max_steps: int = 200,
         stop_token: str = "SHIP LOT",
+        rule_constrained: bool = False,
+        candidate_pool: int = 5,
+        beam_width: int = 1,
+        length_normalize: bool = True,
     ) -> list[str]:
-        """Greedy completion for Task 2."""
+        """Greedy, rule-constrained, or beam-search completion for Task 2.
+
+        Mirrors `NGramBaseline.complete`. `beam_width=1` (default) is the
+        original behavior. `beam_width>1` enables beam search over
+        `predict_topk_with_scores`.
+        """
+        if beam_width > 1:
+            from src.ml.beam_search import _beam_complete
+            return _beam_complete(
+                self.predict_topk_with_scores,
+                family,
+                prefix,
+                max_steps=max_steps,
+                stop_token=stop_token,
+                rule_constrained=rule_constrained,
+                candidate_pool=candidate_pool,
+                beam_width=beam_width,
+                length_normalize=length_normalize,
+            )
         out = list(prefix)
+        if not rule_constrained:
+            for _ in range(max_steps):
+                token_id = self._ranked_token_ids(family, out, k=1, allow_eos=True)[0]
+                token = self.vocab.id_to_token[token_id]
+                if token == EOS_TOKEN:
+                    break
+                out.append(token)
+                if token == stop_token:
+                    break
+            return out
+
+        from src.eval.rule_validator import violation_rules
+
+        base_violations = set(violation_rules(out))
         for _ in range(max_steps):
-            token_id = self._ranked_token_ids(family, out, k=1, allow_eos=True)[0]
-            token = self.vocab.id_to_token[token_id]
-            if token == EOS_TOKEN:
+            token_ids = self._ranked_token_ids(
+                family, out, k=candidate_pool, allow_eos=True
+            )
+            if not token_ids:
                 break
-            out.append(token)
-            if token == stop_token:
+            cands = [self.vocab.id_to_token[tid] for tid in token_ids]
+            chosen: str | None = None
+            for cand in cands:
+                if cand == EOS_TOKEN:
+                    chosen = cand
+                    break
+                trial_violations = set(violation_rules(out + [cand]))
+                if not (trial_violations - base_violations):
+                    chosen = cand
+                    base_violations = trial_violations
+                    break
+            if chosen is None:
+                chosen = cands[0]
+                if chosen != EOS_TOKEN:
+                    base_violations = set(violation_rules(out + [chosen]))
+            if chosen == EOS_TOKEN:
+                break
+            out.append(chosen)
+            if chosen == stop_token:
                 break
         return out
 

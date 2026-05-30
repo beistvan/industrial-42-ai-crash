@@ -82,13 +82,24 @@ def write_nextstep(model, inputs: dict, out_path: Path, k: int = 5) -> None:
                 w.writerow([sid, rank, step])
 
 
-def write_completion(model, inputs: dict, out_path: Path) -> None:
+def write_completion(model, inputs: dict, out_path: Path, *,
+                     rule_constrained: bool = True, candidate_pool: int = 5,
+                     beam_width: int = 1, length_normalize: bool = True) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["SEQUENCE_ID", "STEP_INDEX", "STEP"])
         for sid, (family, partial) in inputs.items():
-            completed = model.complete(family, list(partial), max_steps=300)
+            try:
+                completed = model.complete(
+                    family, list(partial), max_steps=300,
+                    rule_constrained=rule_constrained,
+                    candidate_pool=candidate_pool,
+                    beam_width=beam_width,
+                    length_normalize=length_normalize,
+                )
+            except TypeError:
+                completed = model.complete(family, list(partial), max_steps=300)
             for idx, step in enumerate(completed):
                 w.writerow([sid, idx, step])
 
@@ -112,12 +123,29 @@ def main() -> None:
     ap.add_argument("--eval-anomaly", type=Path,
                     help="Task 3 input CSV (full sequences).")
     ap.add_argument("--out-dir", type=Path, default=REPO_ROOT / "extras" / "results")
+    ap.add_argument("--rule-constrained", dest="rule_constrained",
+                    action="store_true", default=True,
+                    help="(default) Filter Task 2 candidates with validate_sequence.")
+    ap.add_argument("--no-rule-constrained", dest="rule_constrained",
+                    action="store_false",
+                    help="Disable rule-constrained completion (plain greedy / argmax).")
+    ap.add_argument("--candidate-pool", type=int, default=5,
+                    help="Top-k pool considered per step when rule_constrained is on.")
+    ap.add_argument("--beam-width", type=int, default=1,
+                    help="Beam search width for Task 2 completion (1 = greedy).")
+    ap.add_argument("--no-length-normalize", dest="length_normalize",
+                    action="store_false", default=True,
+                    help="Disable length-normalized beam scoring (default on).")
     args = ap.parse_args()
     model = load_sequence_model(args.model)
     if args.eval_valid:
         valid_inputs = _read_eval_csv(args.eval_valid)
         write_nextstep(model, valid_inputs, args.out_dir / "nextstep.csv")
-        write_completion(model, valid_inputs, args.out_dir / "completion.csv")
+        write_completion(model, valid_inputs, args.out_dir / "completion.csv",
+                         rule_constrained=args.rule_constrained,
+                         candidate_pool=args.candidate_pool,
+                         beam_width=args.beam_width,
+                         length_normalize=args.length_normalize)
         print(f"wrote {args.out_dir/'nextstep.csv'} and {args.out_dir/'completion.csv'} "
               f"({len(valid_inputs)} sequences)")
     if args.eval_anomaly:

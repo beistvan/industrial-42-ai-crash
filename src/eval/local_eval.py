@@ -30,6 +30,14 @@ def main() -> None:
                         help="Directory created by scripts/make_dev_split.py.")
     parser.add_argument("--out", type=Path,
                         default=REPO_ROOT / "artifacts" / "local_eval_metrics.json")
+    parser.add_argument("--rule-constrained", dest="rule_constrained",
+                        action="store_true", default=True,
+                        help="(default) Use rule-constrained completion for Task 2.")
+    parser.add_argument("--no-rule-constrained", dest="rule_constrained",
+                        action="store_false",
+                        help="Disable rule-constrained completion.")
+    parser.add_argument("--candidate-pool", type=int, default=5,
+                        help="Top-k pool per step when rule_constrained is on.")
     args = parser.parse_args()
 
     if not args.model.exists():
@@ -51,7 +59,11 @@ def main() -> None:
         )
 
     model = load_sequence_model(args.model)
-    metrics = evaluate_all(model, args.eval_dir).to_dict()
+    metrics = evaluate_all(
+        model, args.eval_dir,
+        rule_constrained=args.rule_constrained,
+        candidate_pool=args.candidate_pool,
+    ).to_dict()
     stats = model.stats() if hasattr(model, "stats") else {"model": type(model).__name__}
     payload = {"model": stats, "metrics": metrics}
     args.out.parent.mkdir(parents=True, exist_ok=True)

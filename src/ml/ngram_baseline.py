@@ -13,6 +13,7 @@ docs/implementation-plan-en.md.
 from __future__ import annotations
 
 import json
+import math
 import pickle
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
@@ -20,6 +21,7 @@ from pathlib import Path
 from typing import Iterable
 
 from src.data.infineon_loader import Family, FAMILIES, Sequences
+from src.ml.beam_search import _beam_complete
 
 
 @dataclass
@@ -66,15 +68,30 @@ class NGramBaseline:
         k: int = 5,
     ) -> list[str]:
         """Return the top-k most likely next tokens for the given prefix."""
+        return [tok for tok, _ in self.predict_topk_with_scores(family, prefix, k)]
+
+    def predict_topk_with_scores(
+        self,
+        family: Family,
+        prefix: list[str],
+        k: int = 5,
+    ) -> list[tuple[str, float]]:
+        """Top-k tokens with `log(count / total)` scores from the matched suffix.
+
+        Backoff uses the family's unconditional distribution. Needed by beam
+        search to compare candidates across different beam expansions.
+        """
         if family not in FAMILIES:
             raise ValueError(f"Unknown family {family!r}")
         for order in range(min(self.max_order, len(prefix)), 0, -1):
             suffix = tuple(prefix[-order:])
             counts = self.suffix_counts[family].get(suffix)
             if counts:
-                return [tok for tok, _ in counts.most_common(k)]
-        # Backoff to the family's unconditional distribution.
-        return [tok for tok, _ in self.unconditional[family].most_common(k)]
+                total = sum(counts.values())
+                return [(tok, math.log(c / total)) for tok, c in counts.most_common(k)]
+        counts = self.unconditional[family]
+        total = sum(counts.values()) or 1
+        return [(tok, math.log(c / total)) for tok, c in counts.most_common(k)]
 
     def complete(
         self,
@@ -83,16 +100,68 @@ class NGramBaseline:
         *,
         max_steps: int = 200,
         stop_token: str = "SHIP LOT",
+        rule_constrained: bool = False,
+        candidate_pool: int = 5,
+        beam_width: int = 1,
+        length_normalize: bool = True,
     ) -> list[str]:
-        """Greedy completion: keep predicting top-1 until stop_token or limit."""
+        """Greedy, rule-constrained, or beam-search completion.
+
+        `beam_width=1` (default) preserves the legacy greedy / rule-constrained
+        behavior. `beam_width>1` enables beam search: at each step every active
+        beam is expanded by its top `candidate_pool` next tokens (filtered by
+        the rule validator when `rule_constrained=True`), then the global top
+        `beam_width` beams are kept, ranked by cumulative log-prob with
+        optional length normalization.
+
+        Rationale for the default `length_normalize=True`: process routes can
+        vary 100–151 steps. Without normalization the beam prefers short
+        completions that bail early.
+        """
+        if beam_width > 1:
+            return _beam_complete(
+                self.predict_topk_with_scores,
+                family,
+                prefix,
+                max_steps=max_steps,
+                stop_token=stop_token,
+                rule_constrained=rule_constrained,
+                candidate_pool=candidate_pool,
+                beam_width=beam_width,
+                length_normalize=length_normalize,
+            )
+
         out = list(prefix)
+        if not rule_constrained:
+            for _ in range(max_steps):
+                top = self.predict_topk(family, out, k=1)
+                if not top:
+                    break
+                nxt = top[0]
+                out.append(nxt)
+                if nxt == stop_token:
+                    break
+            return out
+
+        from src.eval.rule_validator import violation_rules
+
+        base_violations = set(violation_rules(out))
         for _ in range(max_steps):
-            top = self.predict_topk(family, out, k=1)
-            if not top:
+            cands = self.predict_topk(family, out, k=candidate_pool)
+            if not cands:
                 break
-            nxt = top[0]
-            out.append(nxt)
-            if nxt == stop_token:
+            chosen: str | None = None
+            for cand in cands:
+                trial_violations = set(violation_rules(out + [cand]))
+                if not (trial_violations - base_violations):
+                    chosen = cand
+                    base_violations = trial_violations
+                    break
+            if chosen is None:
+                chosen = cands[0]
+                base_violations = set(violation_rules(out + [chosen]))
+            out.append(chosen)
+            if chosen == stop_token:
                 break
         return out
 

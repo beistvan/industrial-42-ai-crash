@@ -27,18 +27,24 @@ out-of-distribution generalization scoring (Task 4).
 For execution during the hackathon, read these in order:
 
 1. `README.md` — this file (one-command path + current numbers).
-2. `docs/PIPELINE.md` — split → train → validate → improve → review loop.
-3. `docs/DATA_SPEC.md` — real Infineon data contract.
-4. `docs/METRICS_INTERPRETATION.md` — how to explain the current dashboard numbers.
-5. `docs/TRANSFORMER_MODEL.md` — compact decoder-only Transformer usage.
-6. `docs/LOCAL_AUGMENTATION.md` — local Step 6 data generation / augmentation.
-7. `docs/LEONARDO_ONBOARDING.md` — AI:AT HPC access checklist (phase 2).
-8. `docs/implementation-plan-en.md` — full strategic plan (Hungarian original at `docs/implementation-plan-hu.md`).
-9. `artifacts/ngram_metrics.json` — latest baseline evidence.
+2. `docs/TASK_BOARD.md` — what's done, what's next, what's blocked.
+3. `docs/PIPELINE.md` — split → train → validate → improve → review loop.
+4. `docs/DATA_SPEC.md` — real Infineon data contract.
+5. `docs/METRICS_INTERPRETATION.md` — how to explain the dashboard numbers.
+6. `docs/TRANSFORMER_MODEL.md` — compact decoder-only Transformer usage.
+7. `docs/LOCAL_AUGMENTATION.md` — local generated-data augmentation.
+8. `docs/LEONARDO_ONBOARDING.md` — AI:AT HPC access checklist (per person).
+9. `docs/LEONARDO_BATTLE_PLAN.md` — runbook for the HPC sweep stages.
+10. `docs/TOMORROW_PLAN.md` — companion runbook with decision matrix + comparison checklist.
+11. `docs/MODEL_EXPLORATION.md` — ranked list of "should we try X?" ideas.
+12. `docs/ADRs/` — architectural decisions (no HF pretrained, rule-constrained default, beam-search opt-in).
+13. `docs/DEMO_SPEC.md` — Streamlit demo spec (incl. planned shock page).
+14. `docs/implementation-plan-en.md` — full strategic plan (Hungarian original at `docs/implementation-plan-hu.md`).
+15. `artifacts/ngram_metrics.json` — latest baseline evidence.
 
-Older planning docs (`AGENTS.md`, `MEMORY.md`, `RULES.md`, `SKILLS.md`,
-`docs/GPU_COMPUTE_PLAN.md`, `docs/LLM_ORCHESTRATION_FOR_THIS_REPO.md`) are
-reference only.
+Older planning docs (`AGENTS.md`, `MEMORY.md`, `RULES.md`, `SKILLS.md`) are
+reference only. Historical merge/fix notes and superseded specs live in
+`docs/archive/` — see `docs/archive/README.md` for the index.
 
 ## Quickstart
 
@@ -88,12 +94,11 @@ and any available `models/transformer_*.pt` checkpoint.
 
 ## Current local baseline state
 
-Typical current run after:
-
-```bash
-make dev-split
-make train-ngram
-```
+Typical current run after `make dev-split && make train-ngram`. Dev eval is
+100 sequences per family truncated at 60% / 80% for Tasks 1+2 (→ 200 items/
+family, 600 overall) and 200 full sequences per family for Task 3 (50% valid,
+50% rule-injected). Numbers refresh on every `make train-ngram` in
+`artifacts/ngram_metrics.json`.
 
 | Task | Metric | Overall |
 | --- | --- | ---: |
@@ -105,6 +110,19 @@ make train-ngram
 | 2 | Normalized edit distance | ~0.224 |
 | 3 | F1 (invalid) | **1.000** |
 | 3 | Rule attribution | ~0.690 |
+
+Task 2 supports two decoding modes — toggleable via `--rule-constrained` /
+`--no-rule-constrained` on both `scripts/predict_submission.py` and
+`src/eval/local_eval.py`. **Default is rule-constrained** (top-5 candidates
+filtered against the official `validate_sequence` each step). Empirical note:
+on the n-gram baseline, plain greedy beats rule-constrained by a hair
+(tok_acc 0.428 vs 0.421) because the n-gram learns grammar implicitly from
+real data. We expect rule-constrained to win on the Transformer once trained,
+since it won't be grammar-perfect.
+
+Task 3 `primary_rule` is the rule fired at the smallest `step_index` in the
+sequence (ties broken by rule name) — this is what raised rule attribution
+from ~0.667 to ~0.690.
 
 Task 3 perfect F1 is expected for this local dev set: invalid examples are
 injected rule violations and the detector calls the official Infineon rule

@@ -42,7 +42,12 @@ from src.data import (  # noqa: E402
     load_extra_families,
     merge_sequence_maps,
 )
-from src.eval.run_eval import evaluate_all  # noqa: E402
+from src.eval.run_eval import (  # noqa: E402
+    evaluate_all,
+    evaluate_anomaly,
+    evaluate_completion,
+    evaluate_next_step,
+)
 from src.ml.transformer_model import (  # noqa: E402
     ProcessTransformerNet,
     SequenceTrainingDataset,
@@ -126,7 +131,8 @@ def _make_optimizer(model: nn.Module, *, lr: float, weight_decay: float):
     )
 
 
-def _batch_loss(model: nn.Module, batch: dict, *, pad_id: int) -> torch.Tensor:
+def _batch_loss(model: nn.Module, batch: dict, *, pad_id: int,
+                label_smoothing: float = 0.0) -> torch.Tensor:
     input_ids = batch["input_ids"]
     labels = batch["labels"]
     attention_mask = batch["attention_mask"]
@@ -135,7 +141,32 @@ def _batch_loss(model: nn.Module, batch: dict, *, pad_id: int) -> torch.Tensor:
         logits.reshape(-1, logits.size(-1)),
         labels.reshape(-1),
         ignore_index=pad_id,
+        label_smoothing=label_smoothing,
     )
+
+
+def _build_scheduler(optimizer, *, kind: str, total_steps: int, warmup_steps: int):
+    """Return a torch lr_scheduler or None."""
+    kind = (kind or "none").lower()
+    if kind == "none":
+        return None
+    warmup_steps = max(0, int(warmup_steps))
+    if kind == "linear":
+        def lr_lambda(step: int) -> float:
+            if step < warmup_steps:
+                return step / max(1, warmup_steps)
+            remain = max(0, total_steps - step)
+            return remain / max(1, total_steps - warmup_steps)
+        return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    if kind == "cosine":
+        def lr_lambda(step: int) -> float:
+            if step < warmup_steps:
+                return step / max(1, warmup_steps)
+            progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+            progress = min(1.0, max(0.0, progress))
+            return 0.5 * (1.0 + math.cos(math.pi * progress))
+        return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    raise ValueError(f"Unknown scheduler: {kind!r}")
 
 
 def _run_epoch(
@@ -146,18 +177,36 @@ def _run_epoch(
     device: torch.device,
     pad_id: int,
     grad_clip: float,
+    label_smoothing: float = 0.0,
+    scheduler=None,
+    use_amp: bool = False,
 ) -> float:
+    """Run one training epoch.
+
+    AMP path uses bfloat16 autocast WITHOUT a GradScaler — bf16's wider
+    exponent range removes the underflow risk that float16 + GradScaler is
+    designed to handle, and mixing the two emits deprecation warnings and
+    can skip optimizer steps spuriously in PyTorch >= 2.1.
+    """
     model.train()
     total_loss = 0.0
     total_batches = 0
     for batch in loader:
-        batch = {k: v.to(device) for k, v in batch.items()}
+        batch = {k: v.to(device, non_blocking=True) for k, v in batch.items()}
         optimizer.zero_grad(set_to_none=True)
-        loss = _batch_loss(model, batch, pad_id=pad_id)
+        if use_amp:
+            with torch.cuda.amp.autocast(dtype=torch.bfloat16):
+                loss = _batch_loss(model, batch, pad_id=pad_id,
+                                   label_smoothing=label_smoothing)
+        else:
+            loss = _batch_loss(model, batch, pad_id=pad_id,
+                               label_smoothing=label_smoothing)
         loss.backward()
         if grad_clip > 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
         optimizer.step()
+        if scheduler is not None:
+            scheduler.step()
         total_loss += float(loss.detach().cpu())
         total_batches += 1
     return total_loss / max(total_batches, 1)
@@ -200,6 +249,10 @@ def _resolve_args_config(args) -> tuple[TransformerConfig, dict[str, Any]]:
         "weight_decay": 1e-2,
         "grad_clip": 1.0,
         "num_workers": 0,
+        "label_smoothing": 0.0,
+        "scheduler": "none",
+        "warmup_steps": 0,
+        "amp": False,
     }
     defaults.update(train_cfg)
     if args.epochs is not None:
@@ -208,6 +261,14 @@ def _resolve_args_config(args) -> tuple[TransformerConfig, dict[str, Any]]:
         defaults["batch_size"] = args.batch_size
     if args.lr is not None:
         defaults["lr"] = args.lr
+    if getattr(args, "label_smoothing", None) is not None:
+        defaults["label_smoothing"] = args.label_smoothing
+    if getattr(args, "scheduler", None) is not None:
+        defaults["scheduler"] = args.scheduler
+    if getattr(args, "warmup_steps", None) is not None:
+        defaults["warmup_steps"] = args.warmup_steps
+    if getattr(args, "amp", None) is not None:
+        defaults["amp"] = args.amp
     return config, defaults
 
 
@@ -246,6 +307,28 @@ def main() -> None:
     parser.add_argument("--epochs", type=int)
     parser.add_argument("--batch-size", dest="batch_size", type=int)
     parser.add_argument("--lr", type=float)
+
+    # HPC / sweep flags.
+    parser.add_argument("--label-smoothing", dest="label_smoothing", type=float)
+    parser.add_argument("--scheduler", choices=["none", "linear", "cosine"])
+    parser.add_argument("--warmup-steps", dest="warmup_steps", type=int)
+    parser.add_argument("--amp", dest="amp", action="store_true", default=None,
+                        help="Enable bfloat16 mixed-precision on CUDA.")
+    parser.add_argument("--no-amp", dest="amp", action="store_false")
+    parser.add_argument("--run-name", default=None,
+                        help="Logical name written into metrics for the sweep leaderboard.")
+    parser.add_argument("--save-best-by", default="dev_mrr",
+                        choices=["dev_loss", "dev_top1", "dev_mrr", "dev_token_acc", "dev_ned"],
+                        help="Metric used to track best checkpoint across epochs.")
+    parser.add_argument("--eval-task1-every", dest="eval_task1_every", type=int, default=1,
+                        help="Run cheap Task-1 dev eval every N epochs (0 = never).")
+    parser.add_argument("--eval-task2-every", dest="eval_task2_every", type=int, default=0,
+                        help="Run expensive Task-2 dev eval every N epochs (0 = end only).")
+    parser.add_argument("--eval-rule-constrained", dest="eval_rule_constrained",
+                        action="store_true", default=True)
+    parser.add_argument("--eval-no-rule-constrained", dest="eval_rule_constrained",
+                        action="store_false")
+    parser.add_argument("--eval-candidate-pool", dest="eval_candidate_pool", type=int, default=5)
     args = parser.parse_args()
 
     require_torch()
@@ -312,9 +395,33 @@ def main() -> None:
         lr=float(train_cfg["lr"]),
         weight_decay=float(train_cfg["weight_decay"]),
     )
+    epochs = int(train_cfg["epochs"])
+    steps_per_epoch = max(1, len(train_loader))
+    total_steps = steps_per_epoch * epochs
+    scheduler = _build_scheduler(
+        optimizer,
+        kind=str(train_cfg.get("scheduler", "none")),
+        total_steps=total_steps,
+        warmup_steps=int(train_cfg.get("warmup_steps", 0)),
+    )
+    use_amp = bool(train_cfg.get("amp", False)) and device.type == "cuda"
+
+    # Best-checkpoint tracking.
+    higher_is_better = args.save_best_by != "dev_loss" and args.save_best_by != "dev_ned"
+    best_value = -math.inf if higher_is_better else math.inf
+    best_epoch = None
+    best_payload = None
+    best_path = args.model_path.with_suffix(args.model_path.suffix + ".best")
+
+    eval_valid_csv = args.eval_dir / "eval_input_valid_dev.csv"
+    eval_valid_gold = args.eval_dir / "eval_input_valid_dev_gold.csv"
+    eval_anom_csv = args.eval_dir / "eval_input_anomaly_dev.csv"
+    eval_anom_gold = args.eval_dir / "eval_input_anomaly_dev_gold.csv"
+
     history = []
     t0 = time.time()
-    epochs = int(train_cfg["epochs"])
+    last_task1: dict | None = None
+    last_task2: dict | None = None
     for epoch in range(1, epochs + 1):
         train_loss = _run_epoch(
             net,
@@ -323,24 +430,87 @@ def main() -> None:
             device=device,
             pad_id=vocab.pad_id,
             grad_clip=float(train_cfg["grad_clip"]),
+            label_smoothing=float(train_cfg.get("label_smoothing", 0.0)),
+            scheduler=scheduler,
+            use_amp=use_amp,
         )
         dev_loss = None
         if dev_loader is not None:
             dev_loss = _eval_lm_loss(net, dev_loader, device=device, pad_id=vocab.pad_id)
+
+        # Cheap Task-1 eval (single forward per dev item).
+        wrapper = TransformerProcessModel(net, vocab, config, device=str(device))
+        task1_metrics = None
+        if args.eval_task1_every > 0 and (epoch % args.eval_task1_every == 0) \
+                and eval_valid_csv.exists() and eval_valid_gold.exists():
+            ev_t = time.time()
+            task1_metrics = evaluate_next_step(wrapper, eval_valid_csv, eval_valid_gold)
+            last_task1 = task1_metrics
+            print(f"      task1 eval ({time.time()-ev_t:.1f}s): "
+                  f"top1={task1_metrics['overall']['top1']:.4f} "
+                  f"top5={task1_metrics['overall']['top5']:.4f} "
+                  f"mrr={task1_metrics['overall']['mrr']:.4f}")
+
+        # Expensive Task-2 eval — opt in via --eval-task2-every.
+        task2_metrics = None
+        if args.eval_task2_every > 0 and (epoch % args.eval_task2_every == 0) \
+                and eval_valid_csv.exists() and eval_valid_gold.exists():
+            ev_t = time.time()
+            task2_metrics = evaluate_completion(
+                wrapper, eval_valid_csv, eval_valid_gold,
+                rule_constrained=args.eval_rule_constrained,
+                candidate_pool=args.eval_candidate_pool,
+            )
+            last_task2 = task2_metrics
+            print(f"      task2 eval ({time.time()-ev_t:.1f}s): "
+                  f"tok_acc={task2_metrics['overall']['token_accuracy']:.4f} "
+                  f"NED={task2_metrics['overall']['normalized_edit_distance']:.4f}")
+
         row = {
             "epoch": epoch,
             "train_loss": train_loss,
             "train_ppl": math.exp(min(train_loss, 20.0)),
             "dev_loss": dev_loss,
             "dev_ppl": math.exp(min(dev_loss, 20.0)) if dev_loss is not None else None,
+            "lr": optimizer.param_groups[0]["lr"],
+            "task1": task1_metrics["overall"] if task1_metrics else None,
+            "task2": task2_metrics["overall"] if task2_metrics else None,
         }
         history.append(row)
         dev_text = f", dev_loss={dev_loss:.4f}" if dev_loss is not None else ""
-        print(f"      epoch {epoch:02d}/{epochs}: train_loss={train_loss:.4f}{dev_text}")
+        print(f"      epoch {epoch:02d}/{epochs}: train_loss={train_loss:.4f}{dev_text} lr={row['lr']:.2e}")
+
+        # Best-checkpoint selection. All sources are checked independently so
+        # picking `dev_token_acc` or `dev_ned` works even when Task 1 also
+        # evaluates (which is the common case during a sweep).
+        metric_sources = {
+            "dev_loss":      dev_loss,
+            "dev_top1":      task1_metrics["overall"]["top1"] if task1_metrics else None,
+            "dev_mrr":       task1_metrics["overall"]["mrr"] if task1_metrics else None,
+            "dev_token_acc": task2_metrics["overall"]["token_accuracy"] if task2_metrics else None,
+            "dev_ned":       task2_metrics["overall"]["normalized_edit_distance"] if task2_metrics else None,
+        }
+        current_value = metric_sources.get(args.save_best_by)
+        if current_value is not None:
+            is_better = (current_value > best_value) if higher_is_better else (current_value < best_value)
+            if is_better:
+                best_value = current_value
+                best_epoch = epoch
+                metadata_best = {
+                    "run_name": args.run_name,
+                    "save_best_by": args.save_best_by,
+                    "best_value": current_value,
+                    "best_epoch": epoch,
+                    "train_cfg": train_cfg,
+                }
+                wrapper.save(best_path, metadata=metadata_best)
+                print(f"      ✓ new best ({args.save_best_by}={current_value:.4f}) -> {best_path.name}")
+
     train_seconds = time.time() - t0
 
-    print(f"[4/5] Saving checkpoint -> {args.model_path}")
+    print(f"[4/5] Saving final checkpoint -> {args.model_path}")
     metadata = {
+        "run_name": args.run_name,
         "seed": args.seed,
         "config_path": str(args.config),
         "train_cfg": train_cfg,
@@ -350,24 +520,41 @@ def main() -> None:
         "extra_counts": extra_counts,
         "history": history,
         "train_seconds": round(train_seconds, 2),
+        "best": {
+            "metric": args.save_best_by,
+            "value": best_value if best_value not in (math.inf, -math.inf) else None,
+            "epoch": best_epoch,
+            "path": str(best_path) if best_epoch is not None else None,
+        },
     }
     wrapper = TransformerProcessModel(net, vocab, config, device=str(device), metadata=metadata)
     wrapper.save(args.model_path, metadata=metadata)
 
     payload: dict[str, Any] = {
+        "run_name": args.run_name,
         "model": wrapper.stats(),
         "train_seconds": round(train_seconds, 2),
         "history": history,
         "extra_data_dir": str(args.extra_data_dir) if args.extra_data_dir else None,
         "extra_counts": extra_counts,
+        "best": metadata["best"],
     }
 
     if args.skip_eval:
-        print("[5/5] Skipping task-level dev evaluation (--skip-eval)")
+        print("[5/5] Skipping final task-level dev evaluation (--skip-eval)")
+        if last_task1 or last_task2:
+            payload["metrics"] = {
+                "task1_next_step": last_task1,
+                "task2_completion": last_task2,
+            }
     else:
         print(f"[5/5] Evaluating task metrics on {args.eval_dir}")
         t1 = time.time()
-        metrics = evaluate_all(wrapper, args.eval_dir)
+        metrics = evaluate_all(
+            wrapper, args.eval_dir,
+            rule_constrained=args.eval_rule_constrained,
+            candidate_pool=args.eval_candidate_pool,
+        )
         eval_seconds = time.time() - t1
         payload["eval_seconds"] = round(eval_seconds, 2)
         payload["metrics"] = metrics.to_dict()
