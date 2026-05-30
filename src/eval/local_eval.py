@@ -30,6 +30,8 @@ def main() -> None:
                         help="Directory created by scripts/make_dev_split.py.")
     parser.add_argument("--out", type=Path,
                         default=REPO_ROOT / "artifacts" / "local_eval_metrics.json")
+    parser.add_argument("--device", default=None,
+                        help="Device for Transformer checkpoints, e.g. cpu or cuda. Ignored for n-gram .pkl models.")
     parser.add_argument("--rule-constrained", dest="rule_constrained",
                         action="store_true", default=True,
                         help="(default) Use rule-constrained completion for Task 2.")
@@ -58,7 +60,7 @@ def main() -> None:
             "\nRun: python scripts/make_dev_split.py --force"
         )
 
-    model = load_sequence_model(args.model)
+    model = load_sequence_model(args.model, device=args.device)
     metrics = evaluate_all(
         model, args.eval_dir,
         rule_constrained=args.rule_constrained,

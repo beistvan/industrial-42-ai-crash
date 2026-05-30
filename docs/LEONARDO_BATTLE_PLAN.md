@@ -3,27 +3,58 @@
 This is the runbook for the hackathon-window HPC sprint. Read top to bottom
 once before kickoff; then keep it open as a cheat sheet.
 
-## Stage 0 — Sanity check on the login node (≤ 10 min)
+## Stage 0 — Copy repo + sanity check (≤ 10 min)
+
+Leonardo login nodes cannot reach GitHub. Copy the repo from your laptop with
+`scp`/`rsync`, then finish setup on the cluster.
+
+**Step 1 — on your laptop** (new terminal, not the SSH session):
+
+```bash
+cd /path/to/industrial-models-that-learn-how-processes-unfold
+
+# Option A — helper script (rsync; skips .git/.venv/cache):
+bash scripts/leonardo/copy_to_leonardo.sh
+
+# Option B — scp via tar pipe (works when rsync is unavailable):
+tar czf - \
+  --exclude='.git' --exclude='.venv' --exclude='__pycache__' \
+  --exclude='models' --exclude='artifacts' --exclude='logs' \
+  . | ssh your_username@login01-ext.leonardo.cineca.it \
+  "mkdir -p \$SCRATCH/industrial && tar xzf - -C \$SCRATCH/industrial"
+```
+
+**Step 2 — on Leonardo** (SSH session):
 
 ```bash
 ssh your_username@login01-ext.leonardo.cineca.it
-cd $SCRATCH
-git clone <repo-url> industrial && cd industrial
+cd $SCRATCH/industrial
 
-# Bring in latest local data + generated extras (scp from your laptop).
-# Required:
-#   data/raw/infineon/                  (already in repo)
-#   data/processed/splits/              (run scripts/make_dev_split.py once)
-#   data/processed/dev_eval/            (same)
-#   data/generated/infineon/            (run scripts/generate_extra_sequences.py)
-#
-# Easiest: just `python3 scripts/make_dev_split.py --force` on Leonardo and
-# `python3 scripts/generate_extra_sequences.py --count-per-family 250 --seed 101`.
+# One-shot: venv + CUDA torch + dev split + extras + optional submit:
+bash scripts/leonardo/stage0_setup.sh
+bash scripts/leonardo/stage0_setup.sh --submit   # add --submit to queue the sweep
 
-# Verify torch sees CUDA from the login node (compute-node check happens via Slurm).
-python3 -c "import torch; print(torch.__version__, torch.cuda.is_available())"
-# If False: install CUDA-enabled torch into your pixi env (see Z10 deck p.85).
+# Or manually:
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+pip install torch --index-url https://download.pytorch.org/whl/cu121
+python scripts/make_dev_split.py --force
+python scripts/generate_extra_sequences.py --count-per-family 250 --seed 101 --force
+python scripts/check_environment.py --require-torch
 ```
+
+`torch.cuda.is_available()` may be `False` on the login node — that is normal.
+CUDA is available on compute nodes where Slurm runs the jobs.
+
+**If pip fails on `scikit-learn==1.6.1`:** the login node default is Python 3.6.
+`stage0_setup.sh` loads `python/3.11.6` automatically. If it still fails:
+
+```bash
+rm -rf .venv
+module load profile/deeplrn
+module load python/3.11.6--gcc--8.5.0   # modmap -m python if name differs
+bash scripts/leonardo/stage0_setup.sh
+``` 
 
 ## Stage 1 — Shortlist sweep (~1.5 h/run × 4 GPUs in parallel)
 
@@ -111,6 +142,22 @@ config crashes.
 
 ## When things go wrong
 
+- **`CUDA driver too old` / `cuda.is_available() is false` on GPU node**: PyTorch
+  was installed as `cu130` but Leonardo A100 uses CUDA 12.1. Fix:
+  ```bash
+  bash scripts/leonardo/fix_torch_cuda.sh
+  ```
+  Then resubmit. In job scripts, `module load cuda/12.1` before training.
+- **`invalid account or expired budget`**: Slurm defaulted to the wrong account
+  (`tra25_sumsch`). Use the hackathon EuroHPC account from `saldo -b`:
+  ```bash
+  saldo -b                    # expect EUHPC_D30_031 with budget remaining
+  export SLURM_ACCOUNT=EUHPC_D30_031
+  sbatch --account=$SLURM_ACCOUNT --array=0-11%4 \
+      scripts/leonardo/sweep_array.slurm configs/sweeps/leonardo_v1.yaml shortlist
+  ```
+  See [CINECA accounting FAQ](https://docs.hpc.cineca.it/faq.html) and
+  [Leonardo docs](https://docs.hpc.cineca.it/hpc/leonardo.html).
 - **`OOM`**: lower `batch_size` (256 → 128 → 64). Medium config + AMP at 256
   fits in 80GB, but very long sequences plus big batches can spike.
 - **`NaN` loss**: drop `label_smoothing` to 0, switch to `--scheduler linear`,

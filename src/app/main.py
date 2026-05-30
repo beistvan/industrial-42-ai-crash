@@ -57,6 +57,8 @@ def available_model_paths() -> list[Path]:
     found = [p for p in DEFAULT_MODEL_PATHS if p.exists()]
     found.extend(p for p in sorted((REPO_ROOT / "models").glob("*.pt")) if p not in found)
     found.extend(p for p in sorted((REPO_ROOT / "models").glob("*.pkl")) if p not in found)
+    found.extend(p for p in sorted((REPO_ROOT / "models" / "sweeps").glob("*.pt.best")) if p not in found)
+    found.extend(p for p in sorted((REPO_ROOT / "models" / "sweeps").glob("*.pt")) if p not in found)
     return found
 
 

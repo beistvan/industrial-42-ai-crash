@@ -29,14 +29,17 @@ if [[ "$N" -lt 1 ]]; then
 fi
 LAST=$((N - 1))
 
-echo "Submitting stage '$STAGE' as Slurm array 0-$LAST (concurrency 4)..."
-SWEEP_OUT=$(sbatch --parsable --array=0-$LAST%4 \
+# Hackathon EuroHPC account (from `saldo -b`). Override: export SLURM_ACCOUNT=...
+ACCOUNT="${SLURM_ACCOUNT:-EUHPC_D30_031}"
+
+echo "Submitting stage '$STAGE' as Slurm array 0-$LAST (concurrency 4, account=$ACCOUNT)..."
+SWEEP_OUT=$(sbatch --parsable --account="$ACCOUNT" --array=0-$LAST%4 \
     scripts/leonardo/sweep_array.slurm "$SWEEP" "$STAGE")
 SWEEP_JOB=${SWEEP_OUT%%;*}
 echo "  array job id: $SWEEP_JOB"
 
 echo "Chaining post-sweep leaderboard..."
-SUM_JOB=$(sbatch --parsable \
+SUM_JOB=$(sbatch --parsable --account="$ACCOUNT" \
     --partition=lrd_all_serial \
     --time=00:15:00 --mem=4G --cpus-per-task=1 \
     --dependency=afterok:$SWEEP_JOB \

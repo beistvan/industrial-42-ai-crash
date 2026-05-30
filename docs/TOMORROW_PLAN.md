@@ -14,16 +14,20 @@ Cross-references: `docs/LEONARDO_BATTLE_PLAN.md` for the *what to type*,
 - [ ] You have a personal Leonardo account + reservation `s_tra_ncc` is
       live for your team.
 
-## 1. Stage 0 — Sanity on the login node (~5 min)
+## 1. Stage 0 — Copy repo + sanity on the login node (~5 min)
+
+Leonardo cannot reach GitHub — copy from your laptop first:
 
 ```bash
+# Laptop (new terminal):
+cd /path/to/industrial-models-that-learn-how-processes-unfold
+bash scripts/leonardo/copy_to_leonardo.sh
+
+# Leonardo (SSH session):
 ssh your_user@login01-ext.leonardo.cineca.it
-cd $SCRATCH
-git clone <repo-url> industrial && cd industrial
-python3 scripts/make_dev_split.py --force
-python3 scripts/generate_extra_sequences.py --count-per-family 250 --seed 101 --force
+cd $SCRATCH/industrial
+bash scripts/leonardo/stage0_setup.sh
 python3 -m pytest -q                    # 33 passed locally; expect same here
-python3 scripts/check_environment.py --require-torch
 ```
 
 Expected: torch sees CUDA on the login node OR is invoked through a

@@ -4,6 +4,7 @@ eval/__pycache__/
 */__pycache__/
 *.py[cod]
 .venv/
+venv/
 .env
 .env.*
 !.env.example
@@ -13,7 +14,6 @@ eval/__pycache__/
 /data/raw/*
 /data/interim/*
 /data/processed/*
-/models/*
 /runs/*
 /checkpoints/*
 /artifacts/*
@@ -27,10 +27,35 @@ eval/__pycache__/
 !/checkpoints/.gitkeep
 !/artifacts/.gitkeep
 
-# Track-provided Infineon data (vendored from Lumos-Data/zero_one_hack_01)
+# Keep sweep leaderboard metadata so teammates can read it without rsync
+!/artifacts/sweeps/
+!/artifacts/sweeps/LEADERBOARD.csv
+!/artifacts/sweeps/LEADERBOARD.md
+!/artifacts/sweeps/m_*.json
+
+# Track-provided Infineon data
 !/data/raw/infineon/
 !/data/raw/infineon/**
+
 
 # OS / IDE
 .DS_Store
 .vscode/settings.json
+
+# Slurm / runtime logs
+logs/
+slurm-*.out
+
+# Leonardo / HPC transfer artifacts
+leo_results_gpu.tgz
+_leo_results_gpu/
+*.tgz
+
+# Local/GPU model checkpoints
+models/*.pt
+models/*.pt.best
+models/sweeps/*.pt
+models/sweeps/*.pkl
+
+# Keep best sweep checkpoints (tracked via git lfs)
+!models/sweeps/*.pt.best

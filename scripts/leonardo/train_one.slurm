@@ -9,6 +9,7 @@
 # Args: $1 = base config YAML, $2 = run_name (used for paths).
 
 #SBATCH --partition=boost_usr_prod
+#SBATCH --account=EUHPC_D30_031
 #SBATCH --reservation=s_tra_ncc
 #SBATCH --job-name=zoh-train
 #SBATCH --nodes=1
@@ -26,6 +27,16 @@ RUN_NAME="${2:-medium_default}"
 
 cd "$SLURM_SUBMIT_DIR"
 mkdir -p logs models/sweeps artifacts/sweeps
+
+if [[ -f scripts/leonardo/load_env.sh ]]; then
+    # shellcheck source=scripts/leonardo/load_env.sh
+    source scripts/leonardo/load_env.sh
+fi
+
+if [[ -f .venv/bin/activate ]]; then
+    # shellcheck disable=SC1091
+    source .venv/bin/activate
+fi
 
 # Pixi-style env activation. Adjust if your team uses Singularity or conda.
 # Example singularity invocation:

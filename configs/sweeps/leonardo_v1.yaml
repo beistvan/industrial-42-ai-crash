@@ -1,4 +1,4 @@
-# Leonardo sweep v1 — first-round shortlisting (10 epochs each).
+# Leonardo sweep v1 — first-round shortlisting (50 epochs each).
 #
 # How to use:
 #   python scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_v1.yaml \
@@ -14,11 +14,11 @@
 defaults:
   base_config: configs/transformer_medium.yaml
   extra_data_dir: data/generated/infineon
-  epochs: 10
+  epochs: 50
   save_best_by: dev_mrr
   eval_task1_every: 1
   eval_task2_every: 0          # skip Task 2 during shortlist (too slow on GPU)
-  amp: true
+  amp: false
   scheduler: cosine
   warmup_steps: 500
   label_smoothing: 0.1

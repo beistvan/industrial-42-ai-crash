@@ -13,17 +13,20 @@
 # Default reservation gives ~4 simultaneous tasks (1 node × 4 GPUs).
 
 #SBATCH --partition=boost_usr_prod
+#SBATCH --account=EUHPC_D30_031
 #SBATCH --reservation=s_tra_ncc
 #SBATCH --job-name=zoh-sweep
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --gpus-per-task=1
+#SBATCH --ntasks=1
+#SBATCH --gpus=1
 #SBATCH --mem=120GB
 #SBATCH --cpus-per-task=8
 #SBATCH --time=06:00:00
 #SBATCH --output=logs/slurm-sweep-%A_%a.out
+#SBATCH --error=logs/slurm-sweep-%A_%a.err
 
 set -euo pipefail
+export PYTHONUNBUFFERED=1
 
 SWEEP="${1:-configs/sweeps/leonardo_v1.yaml}"
 STAGE="${2:-shortlist}"
@@ -31,10 +34,21 @@ STAGE="${2:-shortlist}"
 cd "$SLURM_SUBMIT_DIR"
 mkdir -p logs models/sweeps artifacts/sweeps
 
+module load cuda/12.1 2>/dev/null || module load cuda/12.2 2>/dev/null || true
+
+if [[ -f scripts/leonardo/load_env.sh ]]; then
+    # shellcheck source=scripts/leonardo/load_env.sh
+    source scripts/leonardo/load_env.sh
+fi
+
+if [[ -f .venv/bin/activate ]]; then
+    # shellcheck disable=SC1091
+    source .venv/bin/activate
+fi
 RUN="${RUN:-python3}"
 
 echo "[$(date -Is)] Sweep ${SWEEP} stage=${STAGE} row=${SLURM_ARRAY_TASK_ID}"
-$RUN scripts/sweep_transformer.py \
+$RUN -u scripts/sweep_transformer.py \
     --sweep "$SWEEP" \
     --stage "$STAGE" \
     --row "$SLURM_ARRAY_TASK_ID"

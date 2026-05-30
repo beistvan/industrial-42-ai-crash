@@ -102,3 +102,29 @@ train-transformer-small-extra-local: check-torch
 # Fast local path for step 6 when you only want to verify wiring before a full CPU/GPU run.
 train-transformer-extra-smoke: check-torch
 	OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 $(PYTHON) scripts/train_transformer.py --limit-train-sequences 4 --limit-dev-sequences 2 --limit-extra-sequences 2 --epochs 1 --skip-eval --extra-data-dir data/generated/infineon --d-model 16 --n-layers 1 --n-heads 2 --dim-feedforward 32 --batch-size 2 --model-path models/transformer_extra_smoke.pt --metrics-path artifacts/transformer_extra_smoke_metrics.json --device cpu
+
+
+# Leonardo / Slurm convenience targets. Run these on Leonardo after login, git clone, and env setup.
+leonardo-setup:
+	bash scripts/leonardo/setup_env.sh
+
+leonardo-gpu-smoke:
+	sbatch scripts/leonardo/01_gpu_smoke.slurm
+
+leonardo-train-small:
+	sbatch scripts/leonardo/02_train_small.slurm
+
+leonardo-train-small-extra:
+	sbatch scripts/leonardo/03_train_small_extra.slurm
+
+leonardo-train-medium-extra:
+	sbatch scripts/leonardo/04_train_medium_extra.slurm
+
+leonardo-predict-transformer:
+	sbatch scripts/leonardo/05_predict_transformer.slurm
+
+leonardo-pack:
+	bash scripts/leonardo/pack_for_upload.sh
+
+leonardo-generate-extra-10k:
+	sbatch scripts/leonardo/00_generate_extra_10k.slurm
