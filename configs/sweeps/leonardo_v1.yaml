@@ -1,0 +1,66 @@
+# Leonardo sweep v1 — first-round shortlisting (10 epochs each).
+#
+# How to use:
+#   python scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_v1.yaml \
+#       --stage shortlist --gpu-index $SLURM_ARRAY_TASK_ID
+#
+# Each row produces:
+#   models/sweeps/<run_name>.pt + .pt.best
+#   artifacts/sweeps/<run_name>.json
+#
+# Pick the top 3 by dev_mrr after this stage, then promote them to the
+# `finalists` stage (50 epochs, full Task-2 eval).
+
+defaults:
+  base_config: configs/transformer_medium.yaml
+  extra_data_dir: data/generated/infineon
+  epochs: 10
+  save_best_by: dev_mrr
+  eval_task1_every: 1
+  eval_task2_every: 0          # skip Task 2 during shortlist (too slow on GPU)
+  amp: true
+  scheduler: cosine
+  warmup_steps: 500
+  label_smoothing: 0.1
+
+shortlist:
+  - run_name: m_real_only
+    extra_data_dir: null        # disable augmentation
+    note: honest no-extras baseline
+  - run_name: m_real_extras_1x
+    note: real + 250 extras/family
+  - run_name: m_real_extras_2x
+    # 2x synthetic via a denser regen — assumes you ran generate-extra-local twice
+    # with different seeds and merged. If not, falls back to 1x.
+    extra_data_dir: data/generated/infineon
+    note: identical to 1x for now; placeholder for 2x dir
+  - run_name: m_drop15
+    dropout: 0.15
+  - run_name: m_drop20
+    dropout: 0.2
+  - run_name: m_lr_lo
+    lr: 0.00015
+  - run_name: m_lr_hi
+    lr: 0.0006
+  - run_name: m_ls0
+    label_smoothing: 0.0
+  - run_name: m_ls02
+    label_smoothing: 0.2
+  - run_name: m_warmup_1k
+    warmup_steps: 1000
+  - run_name: m_no_sched
+    scheduler: none
+    warmup_steps: 0
+  - run_name: m_no_ls_no_sched
+    label_smoothing: 0.0
+    scheduler: none
+    warmup_steps: 0
+
+finalists:
+  # Filled in by hand after picking the top-3 shortlist winners.
+  # Example:
+  # - run_name: m_real_extras_1x_full
+  #   base: m_real_extras_1x
+  #   epochs: 50
+  #   eval_task2_every: 10
+  []
