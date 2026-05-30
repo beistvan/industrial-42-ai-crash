@@ -1,0 +1,49 @@
+# Leonardo Wave 2 — fine grid around Wave 1 winners.
+#
+# Edit AFTER reading artifacts/sweeps/LEADERBOARD_FINAL.csv. The rows below
+# are sensible defaults if the f_extras_1x_100_mrr recipe is your Wave 1 leader.
+# Replace dropout/lr ranges with what makes sense given Wave 1 numbers.
+#
+# Submit:
+#   export SLURM_ACCOUNT=EUHPC_D30_031
+#   N=$(python3 scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_fine.yaml \
+#       --stage finalists --dry-run | grep -c '^\[')
+#   sbatch --account=$SLURM_ACCOUNT --array=0-$((N-1))%12 \
+#       scripts/leonardo/sweep_array.slurm configs/sweeps/leonardo_fine.yaml finalists
+
+defaults:
+  base_config: configs/transformer_medium.yaml
+  extra_data_dir: data/generated/infineon
+  epochs: 120
+  save_best_by: dev_mrr
+  eval_task1_every: 1
+  eval_task2_every: 5
+  amp: true
+  scheduler: cosine
+  warmup_steps: 500
+  label_smoothing: 0.1
+
+finalists:
+  - run_name: g_extras_d08
+    dropout: 0.08
+  - run_name: g_extras_d10
+    dropout: 0.10
+  - run_name: g_extras_d12
+    dropout: 0.12
+  - run_name: g_extras_lr25
+    lr: 0.00025
+  - run_name: g_extras_lr40
+    lr: 0.0004
+  - run_name: g_extras_500_t2
+    extra_data_dir: data/generated/infineon_500
+    save_best_by: dev_token_acc
+
+  # Optional Wave 2b — one bigger model. Slower but maybe breaks the plateau.
+  # Uncomment if Wave 2 results are flat.
+  # - run_name: g_large_extras
+  #   d_model: 384
+  #   n_layers: 8
+  #   n_heads: 8
+  #   dim_feedforward: 1536
+  #   batch_size: 128
+  #   epochs: 80

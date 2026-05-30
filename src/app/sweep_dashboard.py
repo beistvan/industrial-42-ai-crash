@@ -140,7 +140,9 @@ with st.expander("Raw leaderboard (Markdown view)"):
         st.caption("Markdown leaderboard not present.")
 
 with st.expander("Per-run metrics JSON"):
-    runs = sorted(SWEEPS_DIR.glob("m_*.json"))
+    # Cover shortlist (m_*), finalists (f_*), fine-grid (g_*) runs.
+    runs = sorted({p for prefix in ("m_", "f_", "g_")
+                   for p in SWEEPS_DIR.glob(f"{prefix}*.json")})
     if not runs:
         st.caption("No per-run JSON files found.")
     else:

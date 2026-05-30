@@ -1,0 +1,52 @@
+# Leonardo Wave 1 — 6 parallel 100/150-epoch finalists.
+#
+# Plan: parallel-search → pick best per task → hybrid submit.
+# Anchor: m_real_extras_1x (current dev MRR leader at 50ep, still climbing).
+#
+# Submit:
+#   export SLURM_ACCOUNT=EUHPC_D30_031
+#   N=$(python3 scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_final.yaml \
+#       --stage finalists --dry-run | grep -c '^\[')
+#   sbatch --account=$SLURM_ACCOUNT --array=0-$((N-1))%12 \
+#       scripts/leonardo/sweep_array.slurm configs/sweeps/leonardo_final.yaml finalists
+#
+# Each finalist tracks Task 2 every 5 epochs (was off during shortlist) so we
+# can pick a Task-2 specialist for hybrid submission if it beats the MRR model.
+
+defaults:
+  base_config: configs/transformer_medium.yaml
+  extra_data_dir: data/generated/infineon
+  epochs: 100
+  save_best_by: dev_mrr
+  eval_task1_every: 1
+  eval_task2_every: 5
+  amp: true                    # re-enable; ~2x throughput, safe at batch 256
+  scheduler: cosine
+  warmup_steps: 500
+  label_smoothing: 0.1
+
+finalists:
+  - run_name: f_extras_1x_100_mrr
+    note: extend current winner recipe to 100 epochs
+
+  - run_name: f_extras_1x_100_t2
+    save_best_by: dev_token_acc
+    note: Task-2 specialist for completion.csv (same recipe, different selection)
+
+  - run_name: f_drop15_100_mrr
+    dropout: 0.15
+    note: best shortlist MRR config
+
+  - run_name: f_no_sched_100_t2
+    scheduler: none
+    warmup_steps: 0
+    save_best_by: dev_token_acc
+    note: shortlist Task-2 leader (m_no_sched peaked early; let it run)
+
+  - run_name: f_extras_500_100_mrr
+    extra_data_dir: data/generated/infineon_500
+    note: 500/family extras (generate first with --count-per-family 500)
+
+  - run_name: f_extras_1x_150_mrr
+    epochs: 150
+    note: longer train on winner recipe
