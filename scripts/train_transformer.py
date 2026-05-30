@@ -179,12 +179,18 @@ def _run_epoch(
     grad_clip: float,
     label_smoothing: float = 0.0,
     scheduler=None,
-    scaler=None,
+    use_amp: bool = False,
 ) -> float:
+    """Run one training epoch.
+
+    AMP path uses bfloat16 autocast WITHOUT a GradScaler — bf16's wider
+    exponent range removes the underflow risk that float16 + GradScaler is
+    designed to handle, and mixing the two emits deprecation warnings and
+    can skip optimizer steps spuriously in PyTorch >= 2.1.
+    """
     model.train()
     total_loss = 0.0
     total_batches = 0
-    use_amp = scaler is not None
     for batch in loader:
         batch = {k: v.to(device, non_blocking=True) for k, v in batch.items()}
         optimizer.zero_grad(set_to_none=True)
@@ -192,19 +198,13 @@ def _run_epoch(
             with torch.cuda.amp.autocast(dtype=torch.bfloat16):
                 loss = _batch_loss(model, batch, pad_id=pad_id,
                                    label_smoothing=label_smoothing)
-            scaler.scale(loss).backward()
-            if grad_clip > 0:
-                scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
-            scaler.step(optimizer)
-            scaler.update()
         else:
             loss = _batch_loss(model, batch, pad_id=pad_id,
                                label_smoothing=label_smoothing)
-            loss.backward()
-            if grad_clip > 0:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
-            optimizer.step()
+        loss.backward()
+        if grad_clip > 0:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+        optimizer.step()
         if scheduler is not None:
             scheduler.step()
         total_loss += float(loss.detach().cpu())
@@ -405,7 +405,6 @@ def main() -> None:
         warmup_steps=int(train_cfg.get("warmup_steps", 0)),
     )
     use_amp = bool(train_cfg.get("amp", False)) and device.type == "cuda"
-    scaler = torch.cuda.amp.GradScaler() if use_amp else None
 
     # Best-checkpoint tracking.
     higher_is_better = args.save_best_by != "dev_loss" and args.save_best_by != "dev_ned"
@@ -433,7 +432,7 @@ def main() -> None:
             grad_clip=float(train_cfg["grad_clip"]),
             label_smoothing=float(train_cfg.get("label_smoothing", 0.0)),
             scheduler=scheduler,
-            scaler=scaler,
+            use_amp=use_amp,
         )
         dev_loss = None
         if dev_loader is not None:
@@ -481,20 +480,17 @@ def main() -> None:
         dev_text = f", dev_loss={dev_loss:.4f}" if dev_loss is not None else ""
         print(f"      epoch {epoch:02d}/{epochs}: train_loss={train_loss:.4f}{dev_text} lr={row['lr']:.2e}")
 
-        # Best-checkpoint selection.
-        current_value = None
-        if args.save_best_by == "dev_loss" and dev_loss is not None:
-            current_value = dev_loss
-        elif task1_metrics is not None:
-            if args.save_best_by == "dev_top1":
-                current_value = task1_metrics["overall"]["top1"]
-            elif args.save_best_by == "dev_mrr":
-                current_value = task1_metrics["overall"]["mrr"]
-        elif task2_metrics is not None:
-            if args.save_best_by == "dev_token_acc":
-                current_value = task2_metrics["overall"]["token_accuracy"]
-            elif args.save_best_by == "dev_ned":
-                current_value = task2_metrics["overall"]["normalized_edit_distance"]
+        # Best-checkpoint selection. All sources are checked independently so
+        # picking `dev_token_acc` or `dev_ned` works even when Task 1 also
+        # evaluates (which is the common case during a sweep).
+        metric_sources = {
+            "dev_loss":      dev_loss,
+            "dev_top1":      task1_metrics["overall"]["top1"] if task1_metrics else None,
+            "dev_mrr":       task1_metrics["overall"]["mrr"] if task1_metrics else None,
+            "dev_token_acc": task2_metrics["overall"]["token_accuracy"] if task2_metrics else None,
+            "dev_ned":       task2_metrics["overall"]["normalized_edit_distance"] if task2_metrics else None,
+        }
+        current_value = metric_sources.get(args.save_best_by)
         if current_value is not None:
             is_better = (current_value > best_value) if higher_is_better else (current_value < best_value)
             if is_better:
