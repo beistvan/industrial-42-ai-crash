@@ -4,7 +4,7 @@ Reads:
     artifacts/sweeps/LEADERBOARD.csv     (sweep summary table)
     artifacts/sweeps/LEADERBOARD.md      (markdown view)
     artifacts/sweeps/m_*.json            (per-run metrics)
-    RESULTS_GPU_SUMMARY.md               (friend's local baseline doc, optional)
+    RESULTS_GPU_SUMMARY.md               (submission baseline summary)
 
 Run:
     streamlit run src/app/sweep_dashboard.py
@@ -19,15 +19,15 @@ import streamlit as st
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SWEEPS_DIR = REPO_ROOT / "artifacts" / "sweeps"
-LEADERBOARD_CSV = SWEEPS_DIR / "LEADERBOARD.csv"
-LEADERBOARD_MD = SWEEPS_DIR / "LEADERBOARD.md"
+LEADERBOARD_CSV = SWEEPS_DIR / "LEADERBOARD_FINAL.csv"
+LEADERBOARD_MD = SWEEPS_DIR / "LEADERBOARD_FINAL.md"
 GPU_SUMMARY = REPO_ROOT / "RESULTS_GPU_SUMMARY.md"
 MODELS_DIR = REPO_ROOT / "models" / "sweeps"
 
 # Recommended winner per analysis: best balance of Task 1 + Task 2,
 # still-improving at epoch cap (best_epoch == 50), uses 1x extras.
-RECOMMENDED = "m_real_extras_1x"
-ALTERNATE = "m_drop15"
+RECOMMENDED = "f_drop15_100_mrr"
+ALTERNATE = "f_extras_1x_100_t2"
 
 st.set_page_config(page_title="Infineon — Sweep Findings", layout="wide")
 st.title("Infineon — Leonardo Sweep Findings")
@@ -66,9 +66,8 @@ else:
                "Rsync from Leonardo or pick another run from the table.")
 
 st.info(
-    f"**Why this pick:** tied #1 on Top-1 with `m_drop15`, "
-    "best Task-2 token-acc among the top group, and still climbing at epoch 50 — "
-    f"more epochs would help. Alternate: `{ALTERNATE}` (marginally higher MRR by 0.0003)."
+    f"**Submission pick:** `{RECOMMENDED}` for Task 1 + anomaly (best dev MRR). "
+    f"Task 2 completion uses `{ALTERNATE}` (best dev token accuracy)."
 )
 
 # --------------------------------------------------------------- leaderboard table
@@ -152,7 +151,7 @@ with st.expander("Per-run metrics JSON"):
         path = SWEEPS_DIR / f"{choice}.json"
         st.json(json.loads(path.read_text(encoding="utf-8")))
 
-with st.expander("Friend's local baseline summary (n-gram vs small transformer)"):
+with st.expander("Submission baseline summary (n-gram vs Wave-1 finalists)"):
     if GPU_SUMMARY.exists():
         st.markdown(GPU_SUMMARY.read_text(encoding="utf-8"))
     else:

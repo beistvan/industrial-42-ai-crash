@@ -33,14 +33,14 @@ from src.ml import NGramBaseline, load_sequence_model  # noqa: E402
 METRIC_CANDIDATES = {
     "ngram_baseline.pkl": REPO_ROOT / "artifacts" / "ngram_metrics.json",
     "transformer_small.pt": REPO_ROOT / "artifacts" / "transformer_metrics.json",
-    "transformer_small_local.pt": REPO_ROOT / "artifacts" / "transformer_small_local_metrics.json",
-    "transformer_small_extra_local.pt": REPO_ROOT / "artifacts" / "transformer_small_extra_local_metrics.json",
     "transformer_smoke.pt": REPO_ROOT / "artifacts" / "transformer_smoke_metrics.json",
+    "f_drop15_100_mrr.pt.best": REPO_ROOT / "artifacts" / "sweeps" / "f_drop15_100_mrr.json",
+    "f_extras_1x_100_t2.pt.best": REPO_ROOT / "artifacts" / "sweeps" / "f_extras_1x_100_t2.json",
 }
 DEFAULT_MODEL_PATHS = [
+    REPO_ROOT / "models" / "sweeps" / "f_drop15_100_mrr.pt.best",
+    REPO_ROOT / "models" / "sweeps" / "f_extras_1x_100_t2.pt.best",
     REPO_ROOT / "models" / "ngram_baseline.pkl",
-    REPO_ROOT / "models" / "transformer_small.pt",
-    REPO_ROOT / "models" / "transformer_small_local.pt",
     REPO_ROOT / "models" / "transformer_smoke.pt",
 ]
 SPLITS_DIR = REPO_ROOT / "data" / "processed" / "splits"

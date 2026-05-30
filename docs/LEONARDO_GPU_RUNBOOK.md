@@ -2,24 +2,17 @@
 
 ## Decision status
 
-Local CPU is done. Use it as the safe baseline:
+Submission baseline is locked in `extras/results_submission/`. Use this for
+demo and jury-facing outputs:
 
 ```bash
-make smoke
-make predict-dev
-make run-demo
-make run-dashboard
+make smoke          # dev split + n-gram + tests
+make run-demo       # Streamlit demo (loads submission checkpoints if present)
+make run-dashboard  # sweep leaderboard dashboard
 ```
 
-The GPU phase is only for the Transformer runs:
-
-1. GPU smoke: prove CUDA + Slurm + repo wiring.
-2. `transformer_small` on real training split.
-3. `transformer_small_extra` on generated extra data.
-4. Optional `transformer_medium_extra` if time remains.
-5. GPU prediction for the best Transformer checkpoint.
-
-Keep `models/ngram_baseline.pkl` and `extras/results/{nextstep,completion,anomaly}.csv` as the fallback submission/demo path.
+Reproduce or refresh submission CSVs on GPU — see [`HANDOFF.md`](../HANDOFF.md)
+and [`README.md`](../README.md).
 
 ## Login and project transfer
 
@@ -140,12 +133,9 @@ scancel <JOBID>
 The GPU scripts write:
 
 ```text
-models/transformer_gpu_smoke.pt
-models/transformer_small.pt
-models/transformer_small_extra.pt
-models/transformer_medium_extra.pt
-artifacts/*transformer*_metrics.json
-extras/results_transformer/{nextstep,completion,anomaly}.csv
+models/sweeps/*.pt.best
+artifacts/sweeps/*.json
+extras/results_submission/{nextstep,completion,anomaly}.csv
 ```
 
 ## Back-copy results
@@ -161,20 +151,21 @@ scripts/leonardo/fetch_results.sh \
 Or directly:
 
 ```bash
-scp -r <USER>@login01-ext.leonardo.cineca.it:$SCRATCH/industrial-infineon/models ./models_leonardo
-scp -r <USER>@login01-ext.leonardo.cineca.it:$SCRATCH/industrial-infineon/artifacts ./artifacts_leonardo
-scp -r <USER>@login01-ext.leonardo.cineca.it:$SCRATCH/industrial-infineon/extras/results_transformer ./results_transformer_leonardo
+scp -r <USER>@login01-ext.leonardo.cineca.it:$SCRATCH/industrial-infineon/models/sweeps ./models_sweeps_leonardo
+scp -r <USER>@login01-ext.leonardo.cineca.it:$SCRATCH/industrial-infineon/artifacts/sweeps ./artifacts_sweeps_leonardo
+scp -r <USER>@login01-ext.leonardo.cineca.it:$SCRATCH/industrial-infineon/extras/results_submission ./results_submission_leonardo
 ```
 
-## Scaling table to fill
+## Wave-1 submission numbers (dev holdout)
 
-| Run | Data | Model | Top-1 | Top-5 | Completion token acc | Notes |
-|---|---:|---|---:|---:|---:|---|
-| baseline | 3k seq | n-gram | current local | current local | current local | no GPU |
-| baseline+extra | 3k + 750 seq | n-gram | current local | current local | current local | generated |
-| small | 3k seq | transformer-small | from `artifacts/transformer_small_metrics.json` | from metrics | optional predict/eval | Leonardo A100 |
-| small+extra | 3k + generated | transformer-small | from `artifacts/transformer_small_extra_metrics.json` | from metrics | optional predict/eval | Leonardo A100 |
-| medium+extra | 3k + generated | transformer-medium | from metrics | from metrics | optional predict/eval | Leonardo A100 |
+| Model | Task 1 Top-1 | Task 1 MRR | Task 2 token-acc |
+|---|---:|---:|---:|
+| N-gram baseline | 0.687 | 0.807 | 0.421 |
+| `f_drop15_100_mrr` (Task 1) | 0.748 | 0.873 | 0.437 |
+| `f_extras_1x_100_t2` (Task 2) | 0.743 | 0.870 | 0.451 |
+
+See [`artifacts/sweeps/LEADERBOARD_FINAL.md`](../artifacts/sweeps/LEADERBOARD_FINAL.md)
+for the full 17-run table.
 
 ## If a job fails
 

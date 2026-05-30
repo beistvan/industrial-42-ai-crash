@@ -13,16 +13,16 @@
 
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
-mkdir -p logs extras/results_transformer
+mkdir -p logs extras/results_submission
 
 module purge || true
 module load python/3.11.7 || true
 source .venv/bin/activate
 
-MODEL="${MODEL:-models/transformer_small_extra.pt}"
-OUT_DIR="${OUT_DIR:-extras/results_transformer}"
-VALID="${VALID:-data/processed/dev_eval/eval_input_valid_dev.csv}"
-ANOM="${ANOM:-data/processed/dev_eval/eval_input_anomaly_dev.csv}"
+MODEL="${MODEL:-models/sweeps/f_drop15_100_mrr.pt.best}"
+OUT_DIR="${OUT_DIR:-extras/results_submission}"
+VALID="${VALID:-EVAL_DATA/eval_input_valid.csv}"
+ANOM="${ANOM:-EVAL_DATA/eval_input_anomaly.csv}"
 
 python scripts/leonardo/check_gpu.py
 python scripts/predict_submission.py \

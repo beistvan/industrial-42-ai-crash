@@ -1,23 +1,30 @@
 # Leonardo GPU Results — Infineon Industrial Track
 
-## Local baseline
+## Baseline vs submission (dev holdout)
 
-| Run | Data | Model | Task 1 Top-1 | Top-3 | Top-5 | MRR |
-|---|---:|---|---:|---:|---:|---:|
-| baseline | 3k seq | n-gram suffix backoff | 0.6867 | 0.9283 | 0.9283 | 0.8072 |
-| baseline+extra | 3k + 750 seq | n-gram suffix backoff | 0.6933 | 0.9483 | 0.9500 | 0.8207 |
-| small | 3k seq | decoder-only Transformer | 0.7017 | 0.9983 | 1.0000 | 0.8479 |
-| small+extra | 3k + 750 seq | decoder-only Transformer | 0.7267 | 0.9983 | 1.0000 | 0.8612 |
+| Model | Task 1 Top-1 | Task 1 MRR | Task 2 token-acc | Task 3 F1 (invalid) |
+|---|---:|---:|---:|---:|
+| N-gram baseline | 0.687 | 0.807 | 0.421 | 1.00 |
+| Submission T1 (`f_drop15_100_mrr`) | **0.748** | **0.873** | 0.437 | 1.00 |
+| Submission T2 (`f_extras_1x_100_t2`) | 0.743 | 0.870 | **0.451** | 1.00 |
 
-## Selected model
+Full sweep table: [`artifacts/sweeps/LEADERBOARD_FINAL.md`](artifacts/sweeps/LEADERBOARD_FINAL.md).
 
-Lead neural checkpoint: `models/transformer_small_extra.pt.best`
+## Submission artifacts
 
-The model is not committed to Git because checkpoint files are ignored. Prediction CSV outputs are stored in:
+Hybrid checkpoint strategy (2 models, 3 CSV files):
 
-- `extras/results_transformer/`
-- `extras/results_transformer_small_extra/`
+| Task | CSV | Checkpoint |
+|---|---|---|
+| Next-step | `extras/results_submission/nextstep.csv` | `models/sweeps/f_drop15_100_mrr.pt.best` |
+| Completion | `extras/results_submission/completion.csv` | `models/sweeps/f_extras_1x_100_t2.pt.best` |
+| Anomaly | `extras/results_submission/anomaly.csv` | rule validator (same run as Task 1) |
+
+Checkpoints are gitignored (~140 MB each). Reproduce with the commands in
+[`README.md`](README.md) or [`HANDOFF.md`](HANDOFF.md).
 
 ## Interpretation
 
-The Transformer improves next-step prediction over the n-gram baseline, especially Top-5 and MRR. Task 3 anomaly detection remains rule-based through the official Infineon validator.
+The Wave-1 GPU sweep on Leonardo pushed Task-1 MRR from 0.807 (n-gram) to
+0.873 (+8.2% relative) and Task-2 token accuracy from 0.421 to 0.451 (+3.0 pp).
+Task 3 remains rule-based through the official Infineon validator.
