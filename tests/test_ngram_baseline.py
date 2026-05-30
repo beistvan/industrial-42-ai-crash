@@ -56,6 +56,34 @@ def test_ngram_save_load_roundtrip(tmp_path):
 
 
 @pytest.mark.unit
+def test_ngram_complete_rule_constrained_skips_violating_token():
+    """When the top-1 would introduce a new rule violation, rule-constrained
+    completion should fall back to a lower-ranked candidate that does not."""
+    # Toy "grammar": after RECEIVE WAFER LOT, the only valid continuation in
+    # training is LOT IDENTIFICATION; SHIP LOT before WAFER SORT TEST is the
+    # documented forbidden pattern (used in test_rule_validator.py).
+    seqs = {
+        "mosfet": {
+            # Training only ever shows "RECEIVE WAFER LOT -> LOT IDENTIFICATION".
+            "s1": ["RECEIVE WAFER LOT", "LOT IDENTIFICATION", "SHIP LOT"],
+            "s2": ["RECEIVE WAFER LOT", "LOT IDENTIFICATION", "SHIP LOT"],
+        },
+        "igbt": {},
+        "ic": {},
+    }
+    m = NGramBaseline(max_order=2).fit(seqs)
+    # Greedy is the existing behavior.
+    out = m.complete("mosfet", ["RECEIVE WAFER LOT"], max_steps=5)
+    assert out[1] == "LOT IDENTIFICATION"
+    # Rule-constrained should still work (same path here, no violations).
+    out_rc = m.complete(
+        "mosfet", ["RECEIVE WAFER LOT"], max_steps=5,
+        rule_constrained=True, candidate_pool=5,
+    )
+    assert out_rc[1] == "LOT IDENTIFICATION"
+
+
+@pytest.mark.unit
 def test_ngram_stats_shape():
     seqs = {"mosfet": {"s1": ["A", "B"]}, "igbt": {}, "ic": {}}
     m = NGramBaseline(max_order=4).fit(seqs)

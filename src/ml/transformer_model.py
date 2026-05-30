@@ -285,16 +285,56 @@ class TransformerProcessModel:
         *,
         max_steps: int = 200,
         stop_token: str = "SHIP LOT",
+        rule_constrained: bool = False,
+        candidate_pool: int = 5,
     ) -> list[str]:
-        """Greedy completion for Task 2."""
+        """Greedy or rule-constrained-greedy completion for Task 2.
+
+        Mirrors `NGramBaseline.complete`: when `rule_constrained=True`, the
+        decoder's top `candidate_pool` choices are filtered against the
+        official Infineon rule validator, skipping any token that would add
+        a new rule violation.
+        """
         out = list(prefix)
+        if not rule_constrained:
+            for _ in range(max_steps):
+                token_id = self._ranked_token_ids(family, out, k=1, allow_eos=True)[0]
+                token = self.vocab.id_to_token[token_id]
+                if token == EOS_TOKEN:
+                    break
+                out.append(token)
+                if token == stop_token:
+                    break
+            return out
+
+        from src.eval.rule_validator import violation_rules
+
+        base_violations = set(violation_rules(out))
         for _ in range(max_steps):
-            token_id = self._ranked_token_ids(family, out, k=1, allow_eos=True)[0]
-            token = self.vocab.id_to_token[token_id]
-            if token == EOS_TOKEN:
+            token_ids = self._ranked_token_ids(
+                family, out, k=candidate_pool, allow_eos=True
+            )
+            if not token_ids:
                 break
-            out.append(token)
-            if token == stop_token:
+            cands = [self.vocab.id_to_token[tid] for tid in token_ids]
+            chosen: str | None = None
+            for cand in cands:
+                if cand == EOS_TOKEN:
+                    chosen = cand
+                    break
+                trial_violations = set(violation_rules(out + [cand]))
+                if not (trial_violations - base_violations):
+                    chosen = cand
+                    base_violations = trial_violations
+                    break
+            if chosen is None:
+                chosen = cands[0]
+                if chosen != EOS_TOKEN:
+                    base_violations = set(violation_rules(out + [chosen]))
+            if chosen == EOS_TOKEN:
+                break
+            out.append(chosen)
+            if chosen == stop_token:
                 break
         return out
 

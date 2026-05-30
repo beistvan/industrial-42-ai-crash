@@ -83,16 +83,48 @@ class NGramBaseline:
         *,
         max_steps: int = 200,
         stop_token: str = "SHIP LOT",
+        rule_constrained: bool = False,
+        candidate_pool: int = 5,
     ) -> list[str]:
-        """Greedy completion: keep predicting top-1 until stop_token or limit."""
+        """Greedy or rule-constrained-greedy completion.
+
+        When `rule_constrained` is False (default) this is plain greedy top-1
+        and the existing test suite still passes. When True, at each step we
+        consider the top `candidate_pool` model predictions and skip any
+        token that would introduce a *new* rule violation. If all candidates
+        would violate, we fall back to the top-1 to make progress.
+        """
         out = list(prefix)
+        if not rule_constrained:
+            for _ in range(max_steps):
+                top = self.predict_topk(family, out, k=1)
+                if not top:
+                    break
+                nxt = top[0]
+                out.append(nxt)
+                if nxt == stop_token:
+                    break
+            return out
+
+        from src.eval.rule_validator import violation_rules
+
+        base_violations = set(violation_rules(out))
         for _ in range(max_steps):
-            top = self.predict_topk(family, out, k=1)
-            if not top:
+            cands = self.predict_topk(family, out, k=candidate_pool)
+            if not cands:
                 break
-            nxt = top[0]
-            out.append(nxt)
-            if nxt == stop_token:
+            chosen: str | None = None
+            for cand in cands:
+                trial_violations = set(violation_rules(out + [cand]))
+                if not (trial_violations - base_violations):
+                    chosen = cand
+                    base_violations = trial_violations
+                    break
+            if chosen is None:
+                chosen = cands[0]
+                base_violations = set(violation_rules(out + [chosen]))
+            out.append(chosen)
+            if chosen == stop_token:
                 break
         return out
 

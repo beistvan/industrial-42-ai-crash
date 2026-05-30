@@ -27,16 +27,28 @@ def is_valid_sequence(steps: Sequence[str]) -> bool:
 
 
 def violation_rules(steps: Sequence[str]) -> list[str]:
-    """Distinct rule names triggered by the sequence (order of first hit)."""
+    """Distinct rule names triggered by the sequence, earliest step_index first.
+
+    The official validator can emit violations in checker order (e.g. all
+    "missing X" checks before all "Y before Z" checks), not in sequence order.
+    For Task 3 the most useful "primary" rule is the earliest-firing one in
+    the sequence — the first divergence from a valid trajectory.
+    """
+    violations = list(_validate(steps))
+    violations.sort(key=lambda v: (getattr(v, "step_index", 10**9), v.rule))
     seen: list[str] = []
-    for v in _validate(steps):
+    for v in violations:
         if v.rule not in seen:
             seen.append(v.rule)
     return seen
 
 
 def classify_sequence(steps: Sequence[str]) -> dict:
-    """Return a structured classification result suitable for Task 3 outputs."""
+    """Return a structured classification result suitable for Task 3 outputs.
+
+    `primary_rule` is the rule fired at the smallest step_index; ties are
+    broken by rule name for determinism.
+    """
     rules = violation_rules(steps)
     return {
         "valid": not rules,

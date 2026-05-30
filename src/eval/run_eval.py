@@ -111,6 +111,9 @@ def evaluate_completion(
     model: NextStepModel,
     valid_input_csv: Path,
     valid_gold_csv: Path,
+    *,
+    rule_constrained: bool = True,
+    candidate_pool: int = 5,
 ) -> dict:
     inputs = _read_long_csv(valid_input_csv)
     golds = _read_long_csv(valid_gold_csv)
@@ -122,7 +125,17 @@ def evaluate_completion(
         completion_only_gold = full[len(partial):]
         if not completion_only_gold:
             continue
-        completed = model.complete(family, list(partial), max_steps=300)
+        try:
+            completed = model.complete(
+                family,
+                list(partial),
+                max_steps=300,
+                rule_constrained=rule_constrained,
+                candidate_pool=candidate_pool,
+            )
+        except TypeError:
+            # Older model objects that don't yet accept the new kwargs.
+            completed = model.complete(family, list(partial), max_steps=300)
         completion_only_pred = completed[len(partial):]
         bucket = per_family[family]
         bucket["n"] += 1
@@ -222,6 +235,9 @@ def evaluate_anomaly(
 def evaluate_all(
     model: NextStepModel,
     eval_dir: Path,
+    *,
+    rule_constrained: bool = True,
+    candidate_pool: int = 5,
 ) -> TaskMetrics:
     return TaskMetrics(
         task1=evaluate_next_step(
@@ -233,6 +249,8 @@ def evaluate_all(
             model,
             eval_dir / "eval_input_valid_dev.csv",
             eval_dir / "eval_input_valid_dev_gold.csv",
+            rule_constrained=rule_constrained,
+            candidate_pool=candidate_pool,
         ),
         task3=evaluate_anomaly(
             eval_dir / "eval_input_anomaly_dev.csv",
