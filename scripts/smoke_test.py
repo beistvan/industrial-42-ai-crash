@@ -66,7 +66,10 @@ def main() -> None:
         f"  Task 2 token_acc: {t2.get('token_accuracy'):.3f}  "
         f"edit_dist: {t2.get('normalized_edit_distance'):.3f}\n"
         f"  Task 3 F1(invalid): {t3.get('f1_invalid'):.3f}  "
-        f"rule_attr: {t3.get('rule_attribution_accuracy'):.3f}"
+        f"rule_attr: {t3.get('rule_attribution_accuracy'):.3f}\n"
+        "  Note: Task 3 F1=1.000 is expected on this local dev set because "
+        "invalid examples are injected rule violations and detection uses the "
+        "official rule validator."
     )
 
 

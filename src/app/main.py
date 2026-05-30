@@ -283,7 +283,7 @@ else:
                 "norm_edit_dist": round(b.get("normalized_edit_distance", 0), 3),
             })
         with st.expander("Per-family breakdown", expanded=False):
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 st.divider()
 st.subheader("Live sequence demo")
@@ -334,7 +334,7 @@ t1_df = pd.DataFrame({
 })
 left, right = st.columns([2, 1])
 with left:
-    st.dataframe(t1_df, use_container_width=True, hide_index=True)
+    st.dataframe(t1_df, width="stretch", hide_index=True)
 with right:
     st.metric("Gold next step", gold_next or "—")
     st.metric("Rank of gold in top-5", rank if rank else "miss")
@@ -369,7 +369,7 @@ for i in range(max_len):
     g = gold_continuation[i] if i < len(gold_continuation) else ""
     diff_rows.append({"i": i, "predicted": p, "gold": g, "match": p == g and p != ""})
 with st.expander("Token-by-token diff", expanded=False):
-    st.dataframe(pd.DataFrame(diff_rows), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(diff_rows), width="stretch", hide_index=True)
 with st.expander("Full predicted sequence", expanded=False):
     st.code(" → ".join(completed), language="text")
 
@@ -420,11 +420,11 @@ if is_ngram_model(model):
         st.code(" → ".join(expl["matched_suffix"]) if expl["matched_suffix"] else "(backoff)", language="text")
     with ex_r:
         st.markdown("**Top-5 with counts**")
-        st.dataframe(pd.DataFrame(expl["topk"]), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(expl["topk"]), width="stretch", hide_index=True)
 else:
     expl = transformer_explanation(model, topk)
     st.info(expl["message"])
-    st.dataframe(pd.DataFrame(expl["topk"]), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(expl["topk"]), width="stretch", hide_index=True)
     with st.expander("Transformer stats", expanded=False):
         st.json(expl["stats"])
 

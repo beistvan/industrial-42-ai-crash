@@ -79,6 +79,7 @@ def _load_split(
     limit_per_family: int | None = None,
     limit_dev_per_family: int | None = None,
     extra_data_dir: Path | None = None,
+    limit_extra_per_family: int | None = None,
 ):
     train_ids = json.loads((split_dir / "train_ids.json").read_text(encoding="utf-8"))
     dev_ids_path = split_dir / "dev_ids.json"
@@ -96,6 +97,11 @@ def _load_split(
             dev_source_ids = dev_source_ids[:limit_dev_per_family]
         dev[fam] = {sid: all_seqs[fam][sid] for sid in dev_source_ids}
     extras = load_extra_families(extra_data_dir)
+    if limit_extra_per_family is not None:
+        extras = {
+            fam: dict(list(extras.get(fam, {}).items())[:limit_extra_per_family])
+            for fam in FAMILIES
+        }
     train = merge_sequence_maps(train, extras)
     extra_counts = {fam: len(extras.get(fam, {})) for fam in FAMILIES}
     return train, dev, extra_counts
@@ -227,6 +233,8 @@ def main() -> None:
                         help="Skip task-level dev evaluation after training.")
     parser.add_argument("--extra-data-dir", type=Path, default=None,
                         help="Optional directory of generated extra CSVs to augment training.")
+    parser.add_argument("--limit-extra-sequences", type=int,
+                        help="Debug only: cap generated extra sequences per family.")
 
     # Config overrides. Leave unset by default so YAML remains the source of truth.
     parser.add_argument("--d-model", dest="d_model", type=int)
@@ -265,6 +273,7 @@ def main() -> None:
         limit_per_family=args.limit_train_sequences,
         limit_dev_per_family=args.limit_dev_sequences,
         extra_data_dir=args.extra_data_dir,
+        limit_extra_per_family=args.limit_extra_sequences,
     )
     print("      train: " + ", ".join(f"{f}={len(s)}" for f, s in train.items()))
     print("      dev  : " + ", ".join(f"{f}={len(s)}" for f, s in dev.items()))

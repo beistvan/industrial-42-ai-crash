@@ -54,13 +54,20 @@ is below this context length after adding the family token.
 
 ## Usage
 
-Create or refresh the local dev split first:
+Create or refresh the local dev split first, and make sure CPU PyTorch is installed:
 
 ```bash
+make setup-cpu
 python scripts/make_dev_split.py --force
 ```
 
 Fast smoke test:
+
+```bash
+make train-transformer-smoke
+```
+
+Equivalent direct command:
 
 ```bash
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python scripts/train_transformer.py \
@@ -128,7 +135,14 @@ After running:
 make generate-extra-local
 ```
 
-you can augment the Transformer training split with generated valid routes:
+you can augment the Transformer training split with generated valid routes.
+First verify the wiring quickly:
+
+```bash
+make train-transformer-extra-smoke
+```
+
+Then run the one-epoch local small model if your CPU environment has enough time:
 
 ```bash
 python scripts/train_transformer.py \
@@ -139,5 +153,7 @@ python scripts/train_transformer.py \
   --model-path models/transformer_small_extra_local.pt \
   --metrics-path artifacts/transformer_small_extra_local_metrics.json
 ```
+
+For debug runs, `--limit-extra-sequences N` caps generated extras per family.
 
 The same `--extra-data-dir` flag is supported by `scripts/train_ngram.py`.

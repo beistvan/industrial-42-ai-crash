@@ -1,0 +1,27 @@
+{
+  "count_per_family": 250,
+  "base_seed": 101,
+  "files": [
+    {
+      "family": "mosfet",
+      "path": "data/generated/infineon/MOSFET_extra_250_seed101.csv",
+      "seed": 101,
+      "sequences": 250,
+      "rows": 31342
+    },
+    {
+      "family": "igbt",
+      "path": "data/generated/infineon/IGBT_extra_250_seed102.csv",
+      "seed": 102,
+      "sequences": 250,
+      "rows": 36936
+    },
+    {
+      "family": "ic",
+      "path": "data/generated/infineon/IC_extra_250_seed103.csv",
+      "seed": 103,
+      "sequences": 250,
+      "rows": 28807
+    }
+  ]
+}
