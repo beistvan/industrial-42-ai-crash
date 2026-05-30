@@ -114,6 +114,8 @@ def evaluate_completion(
     *,
     rule_constrained: bool = True,
     candidate_pool: int = 5,
+    beam_width: int = 1,
+    length_normalize: bool = True,
 ) -> dict:
     inputs = _read_long_csv(valid_input_csv)
     golds = _read_long_csv(valid_gold_csv)
@@ -132,6 +134,8 @@ def evaluate_completion(
                 max_steps=300,
                 rule_constrained=rule_constrained,
                 candidate_pool=candidate_pool,
+                beam_width=beam_width,
+                length_normalize=length_normalize,
             )
         except TypeError:
             # Older model objects that don't yet accept the new kwargs.
@@ -238,6 +242,8 @@ def evaluate_all(
     *,
     rule_constrained: bool = True,
     candidate_pool: int = 5,
+    beam_width: int = 1,
+    length_normalize: bool = True,
 ) -> TaskMetrics:
     return TaskMetrics(
         task1=evaluate_next_step(
@@ -251,6 +257,8 @@ def evaluate_all(
             eval_dir / "eval_input_valid_dev_gold.csv",
             rule_constrained=rule_constrained,
             candidate_pool=candidate_pool,
+            beam_width=beam_width,
+            length_normalize=length_normalize,
         ),
         task3=evaluate_anomaly(
             eval_dir / "eval_input_anomaly_dev.csv",
