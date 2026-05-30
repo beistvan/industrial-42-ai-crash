@@ -1,15 +1,16 @@
 # Leonardo Wave 2 — fine grid around Wave 1 winners.
 #
-# Edit AFTER reading artifacts/sweeps/LEADERBOARD_FINAL.csv. The rows below
-# are sensible defaults if the f_extras_1x_100_mrr recipe is your Wave 1 leader.
-# Replace dropout/lr ranges with what makes sense given Wave 1 numbers.
+# Wave 1 signal (from artifacts/sweeps/LEADERBOARD_FINAL.csv):
+#   Task 1 leader: f_drop15_100_mrr   (MRR 0.8731, top1 0.7483, best_epoch 84)
+#   Task 2 leader: f_extras_1x_100_t2 (dev_token_acc 0.4511, best_epoch 65)
+#   Negative result: f_extras_500_100_mrr WORSE than 1x — stop chasing extras volume.
 #
-# Submit:
+# This grid: drop15 ± neighbours, drop15 × Task-2 selection, drop15 longer.
+# Skip the lr/ls dimensions (Wave 1 + shortlist already covered them).
+#
+# Submit (same pattern as Wave 1):
 #   export SLURM_ACCOUNT=EUHPC_D30_031
-#   N=$(python3 scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_fine.yaml \
-#       --stage finalists --dry-run | grep -c '^\[')
-#   sbatch --account=$SLURM_ACCOUNT --array=0-$((N-1))%12 \
-#       scripts/leonardo/sweep_array.slurm configs/sweeps/leonardo_fine.yaml finalists
+#   make leonardo-wave2
 
 defaults:
   base_config: configs/transformer_medium.yaml
@@ -24,26 +25,39 @@ defaults:
   label_smoothing: 0.1
 
 finalists:
-  - run_name: g_extras_d08
-    dropout: 0.08
-  - run_name: g_extras_d10
-    dropout: 0.10
-  - run_name: g_extras_d12
+  # ---- Track A: tighten around the Task-1 winner (drop15) ----
+  - run_name: g_drop12_mrr
     dropout: 0.12
-  - run_name: g_extras_lr25
-    lr: 0.00025
-  - run_name: g_extras_lr40
-    lr: 0.0004
-  - run_name: g_extras_500_t2
-    extra_data_dir: data/generated/infineon_500
-    save_best_by: dev_token_acc
+    note: lower neighbour of winning dropout
+  - run_name: g_drop17_mrr
+    dropout: 0.17
+    note: upper neighbour of winning dropout
+  - run_name: g_drop15_150_mrr
+    dropout: 0.15
+    epochs: 150
+    note: winner + 50 more epochs (it peaked at 84/100)
 
-  # Optional Wave 2b — one bigger model. Slower but maybe breaks the plateau.
-  # Uncomment if Wave 2 results are flat.
-  # - run_name: g_large_extras
+  # ---- Track B: produce a Task-2 specialist using the winning dropout ----
+  - run_name: g_drop15_t2
+    dropout: 0.15
+    save_best_by: dev_token_acc
+    note: marry Task-1 winning dropout with Task-2 selection criterion
+
+  # ---- Track C: combine winning dropout with no-scheduler (Task-2 leader recipe) ----
+  - run_name: g_drop15_nosched_t2
+    dropout: 0.15
+    scheduler: none
+    warmup_steps: 0
+    save_best_by: dev_token_acc
+    note: drop15 × no-scheduler × t2-selection
+
+  # ---- Track D (single shot): larger model. Skip if Track A-C already win. ----
+  # Uncomment only if Wave 2 trackA shows the medium model is saturated.
+  # - run_name: g_large_drop15
   #   d_model: 384
   #   n_layers: 8
   #   n_heads: 8
   #   dim_feedforward: 1536
   #   batch_size: 128
+  #   dropout: 0.15
   #   epochs: 80
