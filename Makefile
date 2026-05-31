@@ -31,14 +31,11 @@ test-strict: check-torch
 lint:
 	$(PYTHON) -m ruff check src tests scripts || true
 
-run-demo: check-app
-	$(PYTHON) -m streamlit run src/app/main.py --server.port $(STREAMLIT_PORT)
-
 run-dashboard: check-app
-	$(PYTHON) -m streamlit run src/app/eval_dashboard.py --server.port $(STREAMLIT_PORT)
+	$(PYTHON) -m streamlit run src/app/dashboard.py --server.port $(STREAMLIT_PORT)
 
-run-sweep-dashboard: check-app
-	$(PYTHON) -m streamlit run src/app/sweep_dashboard.py --server.port $(STREAMLIT_PORT)
+# Deprecated aliases — all point to the unified dashboard
+run-demo run-sweep-dashboard: run-dashboard
 
 # Full local sanity path: real dev split, n-gram baseline, full tests, smoke report.
 # Transformer tests no longer skip: without PyTorch they fail with an install hint.

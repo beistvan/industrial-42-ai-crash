@@ -14,8 +14,8 @@ from pathlib import Path
 
 REQUIRED_FILES = [
     Path("README.md"),
-    Path("src/app/main.py"),
-    Path("src/app/eval_dashboard.py"),
+    Path("src/app/dashboard.py"),
+    Path("src/app/dashboard_data.py"),
     Path("docs/MODEL_PLAN.md"),
     Path("docs/EVALUATION_PLAN.md"),
     Path("data/processed/splits/train_ids.json"),

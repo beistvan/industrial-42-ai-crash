@@ -57,7 +57,10 @@ Last updated: **2026-05-31 ~04:00 CEST** (Leonardo login node)
 make leonardo-leaderboard-final   # refresh LEADERBOARD_FINAL.csv
 make regenerate-submission        # Slurm predict → result/submission/
 make leonardo-wave3-tune          # h_mod_nosched_drop12 + h_mod_nosched_120
-make run-sweep-dashboard          # Streamlit leaderboard UI
+# Streamlit dashboard (single entry point)
+make run-dashboard              # unified Track 1 UI (default port 8501)
+STREAMLIT_PORT=8502 make run-dashboard
+# Aliases: make run-demo | make run-sweep-dashboard
 bash scripts/leonardo/status_now.sh
 ```
 
