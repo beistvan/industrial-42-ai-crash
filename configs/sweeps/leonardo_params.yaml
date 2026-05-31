@@ -1,13 +1,12 @@
 # Wave 5 — parameter-enriched training (fallback if Wave 3/4 plateau).
 #
-# Trigger: scripts/leonardo/wave5_if_needed.sh (after Wave 3+4 finish)
-#   - Runs only if no h_mod_* / t2_mod_* run beats current T1/T2 bars.
+# Submit manually if needed:
+#   python scripts/sweep_transformer.py \
+#     --sweep configs/sweeps/leonardo_params.yaml --stage finalists --row 0
 #
 # Training inserts `<p:…>` aux tokens after each STEP (reference fab parameters).
 # Inference and judge CSVs remain STEP-only — see docs/ADRs/0004-parameter-enrichment-training.md
 #
-# Submit manually: make leonardo-wave5
-
 defaults:
   base_config: configs/transformer_params.yaml
   arch: modern

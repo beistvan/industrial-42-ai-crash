@@ -3,7 +3,7 @@
 # Goal: test Wave 6 capacity stretch WITHOUT param enrichment or full 100ep.
 # ETA ~60–90 min/GPU once scheduled (60 ep, batch 128).
 #
-# Submit: make leonardo-wave-quick-arch
+# Submit: python scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_quick_arch.yaml --stage shortlist --row N
 
 defaults:
   base_config: configs/transformer_modern_large.yaml

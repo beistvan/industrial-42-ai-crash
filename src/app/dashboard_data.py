@@ -40,7 +40,7 @@ EVAL_PROTOCOL = {
     "judge_submission": {
         "path": "EVAL_DATA/eval_input_*.csv",
         "outputs": "result/submission/{nextstep,completion,anomaly}.csv",
-        "used_for": "Official hackathon submission (Slurm GPU predict on Leonardo)",
+        "used_for": "Official hackathon submission (GPU predict on judge inputs)",
     },
 }
 

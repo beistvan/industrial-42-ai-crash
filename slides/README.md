@@ -9,7 +9,7 @@ Content draft / speaker notes: [`../SLIDES.md`](../SLIDES.md)
 
 ## Export PDF (styled — matches PPTX layout)
 
-**On a laptop** (Leonardo login node has no LibreOffice):
+**On a laptop** (HPC login nodes typically have no LibreOffice):
 
 1. Open `industrial_pitch_deck.pptx` in PowerPoint, Keynote, or Google Slides  
 2. File → Export / Download → **PDF**  

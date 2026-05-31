@@ -71,7 +71,7 @@ def main() -> None:
                 or, manually:
                   python3 -m pip install --upgrade --index-url https://download.pytorch.org/whl/cpu torch
 
-                On Leonardo/GPU, install the CUDA-enabled PyTorch build according to the
+                On GPU, install the CUDA-enabled PyTorch build according to the
                 HPC environment docs, then re-run:
                   make train-transformer-smoke
                 """

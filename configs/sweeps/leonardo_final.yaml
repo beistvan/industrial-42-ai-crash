@@ -4,11 +4,8 @@
 # Anchor: m_real_extras_1x (current dev MRR leader at 50ep, still climbing).
 #
 # Submit:
-#   export SLURM_ACCOUNT=EUHPC_D30_031
-#   N=$(python3 scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_final.yaml \
-#       --stage finalists --dry-run | grep -c '^\[')
-#   sbatch --account=$SLURM_ACCOUNT --array=0-$((N-1))%12 \
-#       scripts/leonardo/sweep_array.slurm configs/sweeps/leonardo_final.yaml finalists
+#   python scripts/sweep_transformer.py \
+#     --sweep configs/sweeps/leonardo_final.yaml --stage finalists --row N
 #
 # Each finalist tracks Task 2 every 5 epochs (was off during shortlist) so we
 # can pick a Task-2 specialist for hybrid submission if it beats the MRR model.

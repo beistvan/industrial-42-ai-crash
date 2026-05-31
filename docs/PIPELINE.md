@@ -144,7 +144,7 @@ Files are written to `result/submission/` for judge eval inputs and
 `eval_metrics.py` expects a different column layout, adjust the writer in
 `scripts/predict_submission.py` only; nothing else needs to change.
 
-## Pre-flight rehearsal (before Slurm sweeps)
+## Pre-flight rehearsal (before long GPU runs)
 
 Run a tiny Transformer train+eval loop to catch tokenizer / schema bugs before
 burning GPU hours:
@@ -152,7 +152,6 @@ burning GPU hours:
 ```bash
 make rehearsal-train          # GPU (~5 min)
 make rehearsal-train-cpu      # CPU fallback (~15 min)
-REHEARSE=1 bash scripts/leonardo/submit_sweep.sh configs/sweeps/leonardo_modern.yaml finalists
 ```
 
 Outputs: `models/rehearsal.pt`, `artifacts/rehearsal_metrics.json`.

@@ -1,7 +1,6 @@
 # Wave 6 — model scale + seed robustness (parallel with Waves 3/4).
 #
-# Submit all at once: make leonardo-queue-parallel
-#   SWEEP_CONCURRENCY=32  (default — tune to your GPU quota)
+# Submit: python scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_scale.yaml --stage shortlist --row N
 
 defaults:
   base_config: configs/transformer_medium.yaml

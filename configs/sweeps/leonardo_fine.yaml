@@ -10,9 +10,7 @@
 # This grid: drop15 ± neighbours, drop15 × Task-2 selection, drop15 longer.
 # Skip the lr/ls dimensions (Wave 1 + shortlist already covered them).
 #
-# Submit (same pattern as Wave 1):
-#   export SLURM_ACCOUNT=EUHPC_D30_031
-#   make leonardo-wave2
+# Submit: python scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_fine.yaml --stage finalists --row N
 
 defaults:
   base_config: configs/transformer_medium.yaml

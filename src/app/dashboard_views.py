@@ -79,7 +79,7 @@ def render_overview(df: pd.DataFrame | None) -> None:
 
     st.subheader("Winning models (dev holdout)")
     if df is None:
-        st.warning("Run `make leonardo-leaderboard-final` first.")
+        st.warning("Run `make leaderboard-final` first.")
         return
 
     t1_run, t2_run, t1_score, t2_score = pick_winners(df)

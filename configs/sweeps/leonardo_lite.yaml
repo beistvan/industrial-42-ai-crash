@@ -3,7 +3,7 @@
 # T1 bar: h_mod_nosched_mrr  dev_mrr 0.8735
 # T2 bar: g_drop15_nosched_t2  dev_token_acc 0.4545
 #
-# Submit: make leonardo-wave-lite
+# Submit: python scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_lite.yaml --stage shortlist --row N
 
 defaults:
   base_config: configs/transformer_modern.yaml

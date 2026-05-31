@@ -17,9 +17,7 @@
 | **Demo video (≤2 min)** | MP4 or unlisted link (see §4) | Demo video |
 | **Team name** | — | Text field |
 
-Operational runbook (GPU jobs, regen, status): [`scripts/README.md`](../scripts/README.md) · [`HANDOFF.md`](../HANDOFF.md)
-
-**Live status:** `bash scripts/leonardo/status_now.sh`
+Operational runbook: [`scripts/README.md`](../scripts/README.md) · [`HANDOFF.md`](../HANDOFF.md)
 
 ---
 
@@ -115,18 +113,15 @@ python scripts/sweep_transformer.py \
 # → models/sweeps/g_drop15_nosched_t2.pt.best
 ```
 
-On Leonardo, submit sweeps via `scripts/leonardo/submit_sweep.sh` — see [`docs/LEONARDO_GPU_RUNBOOK.md`](LEONARDO_GPU_RUNBOOK.md).
-
-**Pre-flight (recommended):** `make rehearsal-train` or `REHEARSE=1 bash scripts/leonardo/submit_sweep.sh …`  
+**Pre-flight (recommended):** `make rehearsal-train`  
 **4-arm demo matrix:** `make eval-matrix` · dashboard tab **Eval matrix**  
 **Pipeline workflow:** [`docs/ENGINEERING_PRACTICES.md`](ENGINEERING_PRACTICES.md)
 
 **Generate judge CSVs:**
 
 ```bash
-make leonardo-leaderboard-final   # refresh picks from metrics JSONs
-make regenerate-submission        # Slurm GPU predict on Leonardo login node
-# local GPU: FORCE_LOCAL=1 make regenerate-submission
+make leaderboard-final   # refresh picks from metrics JSONs
+make regenerate-submission        # GPU predict (requires CUDA)
 ```
 
 Output: `result/submission/{nextstep,completion,anomaly}.csv`
@@ -222,7 +217,7 @@ Before **09:45**:
 - [ ] No secrets in git history  
 - [ ] Fresh clone smoke test passes (`make dev-split && make train-ngram && pytest -q`)
 
-Submission is **final** (`h_mod_nosched_mrr` + `g_drop15_nosched_t2`). Re-run only if a new sweep beats the bar: `make leonardo-leaderboard-final && make regenerate-submission`.
+Submission is **final** (`h_mod_nosched_mrr` + `g_drop15_nosched_t2`). Re-run only if a new sweep beats the bar: `make leaderboard-final && make regenerate-submission`.
 
 ---
 

@@ -69,7 +69,7 @@ def require_torch() -> None:
             "PyTorch is required for the compact Transformer model, even for CPU-only "
             "local smoke runs. Fix locally with `make setup-cpu` or manually with "
             "`python3 -m pip install --upgrade --index-url "
-            "https://download.pytorch.org/whl/cpu torch`. On Leonardo/GPU, install "
+            "https://download.pytorch.org/whl/cpu torch`. On GPU, install "
             "the CUDA-enabled PyTorch build from the HPC environment docs."
         )
 

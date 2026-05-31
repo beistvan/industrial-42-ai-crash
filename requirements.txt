@@ -11,5 +11,5 @@ pytest
 ruff
 # install torch separately for target GPU/CUDA environment if needed
 # Required for compact Transformer local CPU smoke/small runs.
-# On Leonardo/GPU, install the CUDA-enabled PyTorch build according to the HPC docs.
+# On GPU, install the CUDA-enabled PyTorch build according to the HPC docs.
 torch

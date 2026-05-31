@@ -353,7 +353,7 @@ Re-run `make regenerate-submission` only if a new sweep beats the current picks.
 |---|---|---|
 | Persisted dev split | `make dev-split` | Same holdout for all models and evaluators |
 | Artifact schema validation | `make validate-artifacts` | Catch CSV/JSON format drift before sweeps |
-| Training rehearsal | `make rehearsal-train` · `REHEARSE=1 submit_sweep.sh` | Tiny end-to-end train+eval before Slurm array |
+| Training rehearsal | `make rehearsal-train` | Tiny end-to-end train+eval before long GPU runs |
 | 4-arm eval matrix | `make eval-matrix` · dashboard **Eval matrix** tab | Pitch-ready before/after (A baseline → D hybrid) |
 | Graceful skip | `local_eval --allow-missing` · matrix `status: unavailable` | Leaderboard/regen never silently omits a failed arm |
 | Business-aligned metric | NED headline for Task 2 | Lower edit distance = closer fab recipe (not just token %) |

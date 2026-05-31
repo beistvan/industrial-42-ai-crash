@@ -21,7 +21,7 @@ result/submission/            THE submission (3 judge-format CSVs)
 artifacts/sweeps/                     Per-run metrics + LEADERBOARD_FINAL
 data/raw/infineon/                    Organizer-provided source data
 data/generated/infineon/              Synthetic augmentation (deterministic, manifest.json)
-docs/                                 ADRs, data spec, Leonardo GPU runbook, submission notes
+docs/                                 ADRs, data spec, submission notes
 docs/ENGINEERING_PRACTICES.md         Pipeline workflow & engineering practices
 slides/                               Pitch deck (PPTX; see slides/README.md for PDF)
 REPORT.md, README.md, LICENSE         Required jury deliverables
@@ -72,8 +72,8 @@ Full retraining of Wave 1 + Wave 2 picks takes ~2–3 hours on a single A100 GPU
 Checkpoints already on disk? Regenerate judge CSVs in one step:
 
 ```bash
-make leonardo-leaderboard-final   # if metrics JSONs changed
-make regenerate-submission        # picks best T1/T2; Slurm GPU predict on login node
+make leaderboard-final   # if metrics JSONs changed
+make regenerate-submission        # picks best T1/T2; GPU predict (requires CUDA)
 ```
 
 Task 3 (`anomaly.csv`) reuses the **Task-1 checkpoint** for the LM `SCORE` column;
@@ -100,7 +100,7 @@ python scripts/sweep_transformer.py \
 bash scripts/regenerate_submission.sh
 ```
 
-On Leonardo (or any Slurm A100 cluster), use `scripts/leonardo/submit_sweep.sh` with the sweep YAMLs in `configs/sweeps/`. See `docs/LEONARDO_GPU_RUNBOOK.md`.
+Sweep rows expand to plain CLI via `scripts/sweep_transformer.py --row N` (see `configs/sweeps/WINNING_RECIPES.md`).
 
 ## What you need to actually run this
 
@@ -108,7 +108,8 @@ On Leonardo (or any Slurm A100 cluster), use `scripts/leonardo/submit_sweep.sh` 
 - **No API keys, no external services** — everything runs locally
 - **PyTorch** (CPU is fine for inference + baseline; GPU/CUDA 12.1 recommended for training)
 - **A100 or equivalent** if you want to retrain in ≤2 hours; CPU works but slow (~12 h)
-- **Leonardo access is *not* required** to reproduce — the `configs/sweeps/leonardo_*.yaml` files run on any Slurm cluster or as plain CLI rows via `--row N`
+- **GPU with CUDA** required for `make regenerate-submission` (Transformer predict on judge inputs)
+- Sweep YAMLs in `configs/sweeps/leonardo_*.yaml` run as plain CLI rows via `sweep_transformer.py --row N`
 
 ## Honest limits
 

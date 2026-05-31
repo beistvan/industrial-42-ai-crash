@@ -45,8 +45,8 @@ parameter metadata as **training-only auxiliary tokens**.
 ## Trigger
 
 ```bash
-bash scripts/leonardo/wave5_if_needed.sh
-# or: make leonardo-wave5
+python scripts/sweep_transformer.py \
+  --sweep configs/sweeps/leonardo_params.yaml --stage finalists --row 0
 ```
 
 Bars (dev holdout, as of Wave 2):

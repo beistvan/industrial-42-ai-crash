@@ -21,22 +21,19 @@ models/sweeps/h_mod_nosched_mrr.pt.best       # Task 1 + Task 3 SCORE
 models/sweeps/g_drop15_nosched_t2.pt.best     # Task 2 only
 ```
 
-Regenerate from current leaderboard (Leonardo login node — submits GPU predict jobs via Slurm):
+Regenerate from current leaderboard (requires GPU with CUDA):
 
 ```bash
-make leonardo-leaderboard-final   # if new metrics JSONs exist
-make regenerate-submission        # auto Slurm when no local CUDA
+make leaderboard-final   # if new metrics JSONs exist
+make regenerate-submission
 ```
 
-On a machine with a local GPU: `FORCE_LOCAL=1 make regenerate-submission`.
-
-Do **not** load full Transformer checkpoints on the Leonardo login node for scoring —
-they OOM (exit 137). Use `make regenerate-submission` (Slurm) or `sbatch scripts/leonardo/05_predict_transformer.slurm`.
+On CPU-only machines, set `DEVICE=cpu` for a slow smoke run (not for final submission).
 
 ### When a new T1 or T2 leader appears
 
 1. Confirm `models/sweeps/<run>.pt.best` and metrics JSON exist.
-2. `make leonardo-leaderboard-final` — check the run is top for T1 MRR and/or T2 token acc.
+2. `make leaderboard-final` — check the run is top for T1 MRR and/or T2 token acc.
 3. `make regenerate-submission` — writes all three CSVs (T1 job includes anomaly).
 4. Optionally refresh `src/app/track_context.py` `SUBMISSION` if you want static UI copy to match.
 
@@ -126,7 +123,7 @@ make setup-cpu
 make dev-split && make train-ngram && make smoke
 ```
 
-### Train submission models (Leonardo GPU)
+### Train submission models (GPU)
 
 ```bash
 # 1) Dev split + synthetic extras (once)
@@ -141,8 +138,7 @@ python scripts/sweep_transformer.py \
 python scripts/sweep_transformer.py \
   --sweep configs/sweeps/leonardo_fine.yaml --stage finalists --row 4
 
-# On Leonardo: bash scripts/leonardo/submit_sweep.sh configs/sweeps/leonardo_modern.yaml finalists --row 4
-make leonardo-leaderboard-final
+make leaderboard-final
 ```
 
 ### Generate official submission CSVs
@@ -175,23 +171,21 @@ python -m src.eval.local_eval \
 | Wave 5 | skipped | not needed |
 | Wave 6 | skipped | optional experiment |
 
-### Optional HPC appendix (historical)
+### Refresh submission outputs
 
 ```bash
-make leonardo-leaderboard-final
+make leaderboard-final
 make regenerate-submission
 make run-dashboard
 ```
 
-See `docs/LEONARDO_GPU_RUNBOOK.md` for full Leonardo reproduction.
-
-### Pre-flight (before new sweeps)
+### Pre-flight (before new training runs)
 
 See `docs/ENGINEERING_PRACTICES.md` for the full checklist:
 
 ```bash
 make validate-artifacts
-make rehearsal-train              # or REHEARSE=1 on submit_sweep.sh
+make rehearsal-train
 make eval-matrix                    # after checkpoints exist
 ```
 
@@ -206,7 +200,6 @@ make eval-matrix                    # after checkpoints exist
 | `result/submission/*.csv` | Official submission outputs |
 | `scripts/regenerate_submission.sh` | Re-pick T1/T2 from leaderboard + predict |
 | `EVAL_DATA/` | Organizer eval inputs |
-| `docs/LEONARDO_GPU_RUNBOOK.md` | Leonardo reproduction runbook |
 | `docs/ENGINEERING_PRACTICES.md` | Pipeline workflow (rehearsal, eval matrix, schema checks) |
 | `configs/sweeps/leonardo_fine.yaml` | Wave-2 fine grid (completed) |
 | `configs/sweeps/leonardo_modern.yaml` | Wave-3 modern architecture |

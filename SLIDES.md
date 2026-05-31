@@ -160,7 +160,7 @@ More augmentation diverged from real distribution.
 - **Repo (public, MIT):** github.com/beistvan/industrial-42-ai-crash · branch `wave1-submission`
 - **One-command quickstart**: `make dev-split && make train-ngram && pytest -q` (~5 min, CPU)
 - **Dashboard**: `make run-dashboard` — overview, **eval matrix**, leaderboard, training curves
-- **Pre-flight**: `make rehearsal-train` before Slurm sweeps (`REHEARSE=1 bash scripts/leonardo/submit_sweep.sh …`)
+- **Pre-flight**: `make rehearsal-train` before long GPU training runs
 - **REPORT.md** + per-run JSONs + judge-format submission CSVs all checked in.
 
 > **Submission is shipped. The pipeline is reusable. Everything is honest about

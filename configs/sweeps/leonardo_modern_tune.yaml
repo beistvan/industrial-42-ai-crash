@@ -1,5 +1,5 @@
 # Wave 3b — fine-tune around h_mod_nosched_mrr winner (nosched recipe).
-# Submit: make leonardo-wave3-tune
+# Submit: python scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_modern_tune.yaml --stage shortlist --row N
 
 defaults:
   base_config: configs/transformer_modern.yaml

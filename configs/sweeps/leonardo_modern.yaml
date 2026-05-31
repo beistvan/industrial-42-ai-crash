@@ -7,7 +7,7 @@
 # Wave 2 signal: vanilla ceiling ~MRR 0.873; no Wave-2 g_* run beat f_drop15_100_mrr.
 # Goal: architecture change to break Task-1 ceiling.
 #
-# Submit: make leonardo-wave3
+# Submit: python scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_modern.yaml --stage finalists --row N
 
 defaults:
   base_config: configs/transformer_modern.yaml

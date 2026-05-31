@@ -8,18 +8,17 @@ venv/
 .env.*
 !.env.example
 .ipynb_checkpoints/
+.pytest_cache/
+.codex/
 
 # Data / models
 /data/raw/*
-/data/interim/*
 /data/processed/*
 /artifacts/*
 
 # Keep folder structure
 !/data/raw/.gitkeep
-!/data/interim/.gitkeep
 !/data/processed/.gitkeep
-!/models/.gitkeep
 !/artifacts/.gitkeep
 
 # Keep sweep leaderboard metadata so teammates can read it without rsync
@@ -44,7 +43,7 @@ data/raw/infineon/**/*.pyc
 logs/
 slurm-*.out
 
-# Leonardo / HPC transfer artifacts
+# HPC transfer artifacts (optional)
 leo_results_gpu.tgz
 _leo_results_gpu/
 *.tgz

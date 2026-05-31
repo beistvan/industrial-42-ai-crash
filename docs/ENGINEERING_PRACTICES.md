@@ -44,13 +44,13 @@ make train-ngram
 
 make validate-artifacts          # schema checks on CSVs + JSON
 
-make rehearsal-train             # tiny Transformer smoke before Slurm
+make rehearsal-train             # tiny Transformer smoke before long GPU runs
     → models/rehearsal.pt + artifacts/rehearsal_metrics.json
 
-submit_sweep.sh (Slurm array)    # one YAML row = one GPU job
+python scripts/sweep_transformer.py --row N   # one YAML row = one training run
     → models/sweeps/*.pt.best + artifacts/sweeps/*.json
 
-make leonardo-leaderboard-final
+make leaderboard-final
     → LEADERBOARD_FINAL.{csv,md}
 
 make eval-matrix                 # 4-arm before/after on dev holdout
@@ -71,8 +71,8 @@ Any model implementing `predict_topk()` and `complete()` drops into
 |---|---|---|
 | **Persisted dev split** | `make dev-split` | Same holdout for n-gram, Transformer, and all evaluators |
 | **Artifact validation** | `make validate-artifacts` | Required keys on dev CSVs, sweep metrics JSON, split ids |
-| **Training rehearsal** | `make rehearsal-train` · `REHEARSE=1 submit_sweep.sh` | End-to-end train+eval on tiny model before GPU array |
-| **Sweep matrix** | `configs/sweeps/leonardo_*.yaml` + `sweep_array.slurm` | Reproducible hyperparameter rows; one job per row |
+| **Training rehearsal** | `make rehearsal-train` | End-to-end train+eval on tiny model before long runs |
+| **Sweep matrix** | `configs/sweeps/leonardo_*.yaml` + `sweep_transformer.py` | Reproducible hyperparameter rows; one CLI row per run |
 | **4-arm eval matrix** | `make eval-matrix` · dashboard **Eval matrix** tab | Pitch-ready before/after comparison |
 | **Graceful skip** | `local_eval --allow-missing` · matrix `status: unavailable` | Explicit stubs when a checkpoint is absent |
 | **Checkpoint status** | `summarize_runs.py` → `checkpoint_status` column | Leaderboard flags missing `.pt.best` files |
@@ -129,12 +129,13 @@ make validate-artifacts
 make rehearsal-train              # GPU ~5 min
 # make rehearsal-train-cpu        # CPU ~15 min fallback
 
-# 3. Submit sweep (optional rehearsal gate)
-REHEARSE=1 bash scripts/leonardo/submit_sweep.sh configs/sweeps/leonardo_modern.yaml finalists
+# 3. Train a sweep row (example: Wave 3 T1 leader)
+python scripts/sweep_transformer.py \
+  --sweep configs/sweeps/leonardo_modern.yaml --stage finalists --row 4
 
 # 4. After checkpoints exist
 make eval-matrix
-make leonardo-leaderboard-final
+make leaderboard-final
 make regenerate-submission
 
 # 5. Full smoke
@@ -146,22 +147,9 @@ Training & config, Live demo.
 
 ---
 
-## Leonardo-specific guards
-
-- **Slurm array concurrency:** `SWEEP_CONCURRENCY` caps simultaneous jobs
-  (`scripts/leonardo/submit_sweep.sh`).
-- **Login-node OOM:** do not load full Transformer checkpoints on the login node
-  for scoring — use `make regenerate-submission` (Slurm GPU predict). See
-  `HANDOFF.md`.
-- **Wave discipline:** shortlist → finalists → fine grid; pick submission rows
-  from `configs/sweeps/WINNING_RECIPES.md`.
-
----
-
 ## Related docs
 
 - [`PIPELINE.md`](PIPELINE.md) — module map and end-to-end loop
 - [`SUBMISSION.md`](SUBMISSION.md) — jury deliverables and reproduce commands
-- [`LEONARDO_GPU_RUNBOOK.md`](LEONARDO_GPU_RUNBOOK.md) — cluster operations
 - [`ADRs/0001-no-hf-pretrained.md`](ADRs/0001-no-hf-pretrained.md) — model choice
 - [`../configs/sweeps/WINNING_RECIPES.md`](../configs/sweeps/WINNING_RECIPES.md) — submission rows

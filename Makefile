@@ -5,7 +5,7 @@ STREAMLIT_PORT ?= 8501
 	run-dashboard dashboard smoke dev-split train-ngram generate-extra-local \
 	local-eval predict-dev train-transformer-smoke predict-dev-transformer \
 	rehearsal-train validate-artifacts eval-matrix \
-	leonardo-leaderboard-final regenerate-submission leonardo-status slides-pdf
+	leaderboard-final regenerate-submission slides-pdf
 
 # --- Environment ---
 
@@ -103,18 +103,15 @@ eval-matrix-cpu: dev-split
 
 # --- Submission (final picks frozen) ---
 
-leonardo-leaderboard-final:
+leaderboard-final:
 	$(PYTHON) scripts/summarize_runs.py \
 		--metrics-dir artifacts/sweeps \
 		--out artifacts/sweeps/LEADERBOARD_FINAL.md \
 		--csv artifacts/sweeps/LEADERBOARD_FINAL.csv
 	@echo "Wrote artifacts/sweeps/LEADERBOARD_FINAL.{md,csv}"
 
-regenerate-submission:
-	USE_SLURM=1 bash scripts/regenerate_submission.sh
-
-leonardo-status:
-	bash scripts/leonardo/status_now.sh
+regenerate-submission: check-torch
+	bash scripts/regenerate_submission.sh
 
 slides-pdf:
 	bash scripts/export_slides.sh
