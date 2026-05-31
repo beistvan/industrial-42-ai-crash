@@ -24,7 +24,7 @@ data/raw/infineon/                    Organizer-provided source data
 data/generated/infineon/              Synthetic augmentation (deterministic)
 docs/                                 ADRs, data spec, ENGINEERING_PRACTICES, SUBMISSION
 slides/                               Pitch deck (PPTX; see slides/README.md)
-Makefile                              dev-split, smoke, leaderboard, regen, dashboard
+Makefile                              dev-split, test, leaderboard, regen, dashboard
 REPORT.md, README.md, HANDOFF.md      Jury + teammate docs
 ```
 
@@ -46,87 +46,99 @@ REPORT.md, README.md, HANDOFF.md      Jury + teammate docs
 
 Full per-run leaderboard in [`artifacts/sweeps/LEADERBOARD_FINAL.md`](artifacts/sweeps/LEADERBOARD_FINAL.md).
 
-## Quickstart (≈5 min, CPU-only)
+## Quickstart (CPU verify, ~5 min)
+
+Confirms the repo installs, builds the dev split, and passes tests. No GPU training
+in this path — submission checkpoints are gitignored (~43 MB); see **Reproducing
+the submission** below.
 
 ```bash
-git clone -b wave1-submission https://github.com/beistvan/industrial-42-ai-crash.git
+git clone https://github.com/beistvan/industrial-42-ai-crash.git
 cd industrial-42-ai-crash
 
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-pip install --index-url https://download.pytorch.org/whl/cpu torch
-
-python scripts/check_environment.py --require-torch
-make dev-split           # builds data/processed/splits/ and dev_eval/
-make train-ngram         # baseline; ~2 minutes
-make smoke               # pytest + artifact validation (~1 min more)
-# or: pytest -q          # 58 tests
-make run-dashboard       # optional — metrics, leaderboard, eval matrix, live demo
+make setup-cpu
+make dev-split              # data/processed/splits/ + dev_eval/
+make test                   # 58 pytest tests
+make validate-artifacts     # schema checks on dev CSVs + sweep metrics JSON
+make dashboard              # optional — metrics, leaderboard, eval matrix, live demo
 ```
 
-The repo includes everything **except model checkpoints** (they're ~140 MB and
-gitignored). To reproduce the transformer numbers, see **Reproducing the
-submission** below.
+Optional baseline (not required for the Transformer submission):
+
+```bash
+make train-ngram            # artifacts/ngram_metrics.json + models/ngram_baseline.pkl
+make smoke                  # dev-split + n-gram + pytest + artifact check
+```
 
 ## Reproducing the submission
 
-Full retraining of Wave 1 + Wave 2 picks takes ~2–3 hours on a single A100 GPU.
-Checkpoints already on disk? Regenerate judge CSVs:
+**Hybrid picks (frozen):** `h_mod_nosched_mrr` (Task 1 + Task 3 SCORE) +
+`g_drop15_nosched_t2` (Task 2). Recipes: [`configs/sweeps/WINNING_RECIPES.md`](configs/sweeps/WINNING_RECIPES.md).
+
+Checkpoints already on disk? Regenerate judge CSVs (CUDA GPU):
 
 ```bash
 make leaderboard-final      # if metrics JSONs changed
-make regenerate-submission  # hybrid T1/T2 predict → result/submission/ (CUDA GPU)
+make regenerate-submission  # → result/submission/{nextstep,completion,anomaly}.csv
 ```
 
 Task 3 (`anomaly.csv`) reuses the **Task-1 checkpoint** for the LM `SCORE` column;
 rule detection is fixed validator logic — no separate Task-3 model to retrain.
 
-Train from scratch:
+### Train from scratch (~2–3 h on one A100)
 
 ```bash
-# 1. Synthetic augmentation (deterministic, 1x extras)
-python scripts/generate_extra_sequences.py \
-    --count-per-family 250 --seed 101 --force
+# 1. Data prep (once)
+make dev-split
+make generate-extra-local   # +250 valid sequences/family → data/generated/infineon/
 
-# Task 1 leader (Wave 3 modern, row 4)
+# 2. Task 1 — modern stack (base: configs/transformer_modern.yaml)
+#    Sweep row 4 → h_mod_nosched_mrr
 python scripts/sweep_transformer.py \
-    --sweep configs/sweeps/leonardo_modern.yaml --stage finalists --row 4
-# -> models/sweeps/h_mod_nosched_mrr.pt.best
+  --sweep configs/sweeps/leonardo_modern.yaml --stage finalists --row 4
+# → models/sweeps/h_mod_nosched_mrr.pt.best
 
-# Task 2 leader (Wave 2 fine grid, row 4)
+# 3. Task 2 — vanilla stack (base: configs/transformer_medium.yaml)
+#    Sweep row 4 → g_drop15_nosched_t2
 python scripts/sweep_transformer.py \
-    --sweep configs/sweeps/leonardo_fine.yaml --stage finalists --row 4
-# -> models/sweeps/g_drop15_nosched_t2.pt.best
+  --sweep configs/sweeps/leonardo_fine.yaml --stage finalists --row 4
+# → models/sweeps/g_drop15_nosched_t2.pt.best
 
-# 3. Hybrid predictions on judge inputs
+# 4. Hybrid judge CSVs
+make leaderboard-final
 make regenerate-submission
-# or: bash scripts/regenerate_submission.sh
 ```
 
-Winning sweep rows: [`configs/sweeps/WINNING_RECIPES.md`](configs/sweeps/WINNING_RECIPES.md)  
+Each `sweep_transformer.py` row expands to `scripts/train_transformer.py` with
+the merged YAML knobs (`base_config`, dropout, scheduler, `save_best_by`, etc.).
+
 Pipeline checklist: [`docs/ENGINEERING_PRACTICES.md`](docs/ENGINEERING_PRACTICES.md)
 
 ## Makefile shortcuts
 
 | Target | Purpose |
 |---|---|
+| `make setup-cpu` | venv deps + CPU PyTorch |
 | `make dev-split` | Build persisted dev holdout |
-| `make train-ngram` | N-gram baseline + metrics JSON |
-| `make smoke` | dev-split + n-gram + pytest + artifact check |
+| `make test` | Run pytest (58 tests) |
 | `make validate-artifacts` | Schema checks on CSVs and metrics JSON |
+| `make generate-extra-local` | Synthetic augmentation (250/family) |
 | `make rehearsal-train` | Tiny Transformer train+eval before long GPU runs |
 | `make eval-matrix` | 4-arm before/after comparison (dashboard tab) |
 | `make leaderboard-final` | Refresh `LEADERBOARD_FINAL.{csv,md}` |
 | `make regenerate-submission` | Pick T1/T2 + write judge CSVs (CUDA) |
 | `make dashboard` | Unified Streamlit UI |
+| `make train-ngram` | Optional n-gram baseline |
+| `make smoke` | Optional full CPU pipeline incl. n-gram |
 
 ## What you need to actually run this
 
 - **Python 3.10+**, ~2 GB disk
 - **No API keys, no external services** — everything runs locally
-- **PyTorch** — CPU for baseline/smoke; **CUDA GPU** for Transformer training and `make regenerate-submission`
+- **PyTorch** — CPU for quickstart/tests; **CUDA GPU** for Transformer training and `make regenerate-submission`
 - **A100 or equivalent** if you want to retrain both submission models in ≤3 hours
-- Sweep YAMLs (`configs/sweeps/leonardo_*.yaml`) expand to CLI via `sweep_transformer.py --row N` — no cluster scripts required
+- Sweep YAMLs (`configs/sweeps/leonardo_*.yaml`) expand to CLI via `sweep_transformer.py --row N`
 
 ## Honest limits
 
