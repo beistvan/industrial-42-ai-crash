@@ -1,0 +1,60 @@
+# Wave 3 — modern decoder (RoPE + RMSNorm + SwiGLU), trained from scratch.
+#
+# Data: trains on STEP tokens from training_data/*_variants.csv (3k official +
+# generated extras). Reference DESCRIPTION/parameters are NOT in variant CSVs;
+# see src/data/step_metadata.py for lookup (demo/report). Judge outputs STEP only.
+#
+# Wave 2 signal: vanilla ceiling ~MRR 0.873; no Wave-2 g_* run beat f_drop15_100_mrr.
+# Goal: architecture change to break Task-1 ceiling.
+#
+# Submit: make leonardo-wave3
+
+defaults:
+  base_config: configs/transformer_modern.yaml
+  arch: modern
+  extra_data_dir: data/generated/infineon
+  epochs: 100
+  save_best_by: dev_mrr
+  eval_task1_every: 1
+  eval_task2_every: 5
+  amp: true
+  scheduler: cosine
+  warmup_steps: 500
+  label_smoothing: 0.1
+
+finalists:
+  - run_name: h_mod_drop15_mrr
+    dropout: 0.15
+    note: Wave-1 winning dropout on modern stack
+  - run_name: h_mod_drop12_mrr
+    dropout: 0.12
+    note: best Wave-2 MRR neighbour (g_drop12 peak 0.870)
+  - run_name: h_mod_drop17_mrr
+    dropout: 0.17
+    note: upper dropout neighbour
+  - run_name: h_mod_drop15_120
+    dropout: 0.15
+    epochs: 120
+    note: longer train — Wave-1 peaked at ep84/100
+  - run_name: h_mod_nosched_mrr
+    dropout: 0.15
+    scheduler: none
+    warmup_steps: 0
+    note: fast-converge recipe from Wave 2
+  - run_name: h_mod_drop15_t2
+    dropout: 0.15
+    save_best_by: dev_token_acc
+    scheduler: none
+    warmup_steps: 0
+    completion_prefix_min: 0.6
+    completion_prefix_max: 0.8
+    eval_beam_width: 4
+    note: modern T2 specialist
+  - run_name: h_mod_large_mrr
+    base_config: configs/transformer_modern_large.yaml
+    batch_size: 128
+    epochs: 80
+    note: modern d384×8L
+  - run_name: h_mod_seed13_mrr
+    seed: 13
+    note: seed robustness on modern stack

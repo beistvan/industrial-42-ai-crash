@@ -1,0 +1,57 @@
+# Wave 6 — model scale + seed robustness (parallel with Waves 3/4).
+#
+# Submit all at once: make leonardo-queue-parallel
+#   SWEEP_CONCURRENCY=32  (default — tune to your GPU quota)
+
+defaults:
+  base_config: configs/transformer_medium.yaml
+  extra_data_dir: data/generated/infineon
+  epochs: 100
+  save_best_by: dev_mrr
+  eval_task1_every: 1
+  eval_task2_every: 5
+  amp: true
+  scheduler: cosine
+  warmup_steps: 500
+  label_smoothing: 0.1
+  dropout: 0.15
+
+finalists:
+  - run_name: s_van_large_mrr
+    base_config: configs/transformer_large.yaml
+    batch_size: 128
+    epochs: 80
+    note: vanilla d384×8L — capacity stretch
+  - run_name: s_mod_large_mrr
+    base_config: configs/transformer_modern_large.yaml
+    arch: modern
+    batch_size: 128
+    epochs: 80
+    note: modern d384×8L
+  - run_name: s_van_seed7_mrr
+    seed: 7
+    note: seed robustness on Wave-1 recipe
+  - run_name: s_van_seed13_mrr
+    seed: 13
+  - run_name: s_van_seed99_mrr
+    seed: 99
+  - run_name: s_van_drop15_150_mrr
+    epochs: 150
+    note: longer train on medium vanilla
+  - run_name: s_mod_drop15_t2
+    base_config: configs/transformer_modern.yaml
+    arch: modern
+    save_best_by: dev_token_acc
+    scheduler: none
+    warmup_steps: 0
+    completion_prefix_min: 0.6
+    completion_prefix_max: 0.8
+    eval_beam_width: 4
+    note: modern T2 specialist (parallel with Wave 4)
+  - run_name: s_van_nosched_t2
+    save_best_by: dev_token_acc
+    scheduler: none
+    warmup_steps: 0
+    completion_prefix_min: 0.6
+    completion_prefix_max: 0.8
+    note: vanilla T2 nosched (Wave-2 recipe cross-check)

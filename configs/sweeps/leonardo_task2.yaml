@@ -1,0 +1,56 @@
+# Wave 4 — Task 2 specialists on modern architecture.
+#
+# Data alignment with Track 1 judge eval:
+#   - Training: STEP tokens + random 60–80% prefix (matches eval_input_valid.csv)
+#   - Loss: suffix only (completion-aware)
+#   - Inference/submission: still outputs STEP tokens only (pipe-separated)
+#   - Reference DESCRIPTION/parameters: demo enrichment via step_metadata.py
+#
+# Wave 2 signal: g_drop15_nosched_t2 best T2 tok_acc 0.4545 (beat Wave-1 0.451).
+#
+# Submit: make leonardo-wave4
+
+defaults:
+  base_config: configs/transformer_modern.yaml
+  arch: modern
+  extra_data_dir: data/generated/infineon
+  epochs: 100
+  save_best_by: dev_token_acc
+  eval_task1_every: 5
+  eval_task2_every: 5
+  eval_beam_width: 4
+  eval_candidate_pool: 5
+  amp: true
+  scheduler: none
+  warmup_steps: 0
+  label_smoothing: 0.1
+  completion_prefix_min: 0.6
+  completion_prefix_max: 0.8
+
+finalists:
+  - run_name: t2_mod_nosched_t2
+    dropout: 0.15
+    note: Wave-2 winner recipe (drop15 + no sched) on modern stack
+  - run_name: t2_mod_prefix_t2
+    dropout: 0.15
+    note: prefix training + beam-4 eval
+  - run_name: t2_mod_drop10_t2
+    dropout: 0.10
+    note: Wave-1 T2 specialist dropout
+  - run_name: t2_mod_beam8_t2
+    dropout: 0.15
+    eval_beam_width: 8
+    note: wider beam at checkpoint selection
+  - run_name: t2_mod_drop12_t2
+    dropout: 0.12
+    note: Wave-2 dropout neighbour
+  - run_name: t2_mod_drop17_t2
+    dropout: 0.17
+  - run_name: t2_mod_120_t2
+    dropout: 0.15
+    epochs: 120
+    note: longer prefix-training run
+  - run_name: t2_mod_beam5_t2
+    dropout: 0.15
+    eval_beam_width: 5
+    note: beam width match submission default

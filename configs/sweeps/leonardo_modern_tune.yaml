@@ -1,0 +1,24 @@
+# Wave 3b — fine-tune around h_mod_nosched_mrr winner (nosched recipe).
+# Submit: make leonardo-wave3-tune
+
+defaults:
+  base_config: configs/transformer_modern.yaml
+  arch: modern
+  extra_data_dir: data/generated/infineon
+  save_best_by: dev_mrr
+  eval_task1_every: 1
+  eval_task2_every: 5
+  amp: true
+  scheduler: none
+  warmup_steps: 0
+  label_smoothing: 0.1
+
+finalists:
+  - run_name: h_mod_nosched_drop12
+    dropout: 0.12
+    epochs: 100
+    note: nosched winner + Wave-2 drop12 neighbour
+  - run_name: h_mod_nosched_120
+    dropout: 0.15
+    epochs: 120
+    note: nosched winner + longer train (Wave-1 peaked ep84)

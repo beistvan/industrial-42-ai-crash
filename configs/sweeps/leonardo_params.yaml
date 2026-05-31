@@ -1,0 +1,57 @@
+# Wave 5 — parameter-enriched training (fallback if Wave 3/4 plateau).
+#
+# Trigger: scripts/leonardo/wave5_if_needed.sh (after Wave 3+4 finish)
+#   - Runs only if no h_mod_* / t2_mod_* run beats current T1/T2 bars.
+#
+# Training inserts `<p:…>` aux tokens after each STEP (reference fab parameters).
+# Inference and judge CSVs remain STEP-only — see docs/ADRs/0004-parameter-enrichment-training.md
+#
+# Submit manually: make leonardo-wave5
+
+defaults:
+  base_config: configs/transformer_params.yaml
+  arch: modern
+  extra_data_dir: data/generated/infineon
+  param_enrichment: after_step
+  epochs: 100
+  save_best_by: dev_mrr
+  eval_task1_every: 1
+  eval_task2_every: 5
+  amp: true
+  scheduler: cosine
+  warmup_steps: 500
+  label_smoothing: 0.1
+
+finalists:
+  - run_name: p5_mod_drop15_mrr
+    dropout: 0.15
+    note: modern + param aux tokens; T1 selection (Wave-1 recipe)
+  - run_name: p5_mod_nosched_mrr
+    dropout: 0.15
+    scheduler: none
+    warmup_steps: 0
+    note: fast-converge + params — Wave-2 nosched signal
+  - run_name: p5_mod_drop15_t2
+    dropout: 0.15
+    save_best_by: dev_token_acc
+    scheduler: none
+    warmup_steps: 0
+    completion_prefix_min: 0.6
+    completion_prefix_max: 0.8
+    eval_beam_width: 4
+    note: param-enriched prefix training for Task 2
+  - run_name: p5_van_drop15_mrr
+    base_config: configs/transformer_medium.yaml
+    arch: vanilla
+    max_len: 256
+    param_enrichment: after_step
+    dropout: 0.15
+    note: vanilla stack + params — isolate architecture vs metadata signal
+  - run_name: p5_mod_large_mrr
+    base_config: configs/transformer_modern_large.yaml
+    param_enrichment: after_step
+    max_len: 256
+    note: large modern + param aux tokens
+  - run_name: p5_mod_seed13_mrr
+    seed: 13
+    note: seed check with param enrichment

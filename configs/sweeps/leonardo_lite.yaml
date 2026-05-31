@@ -1,0 +1,38 @@
+# Wave 7 lite — two cheap jobs cloned from current T1/T2 winning recipes.
+#
+# T1 bar: h_mod_nosched_mrr  dev_mrr 0.8735
+# T2 bar: g_drop15_nosched_t2  dev_token_acc 0.4545
+#
+# Submit: make leonardo-wave-lite
+
+defaults:
+  base_config: configs/transformer_modern.yaml
+  arch: modern
+  extra_data_dir: data/generated/infineon
+  amp: true
+  label_smoothing: 0.1
+  dropout: 0.15
+
+finalists:
+  - run_name: h_mod_nosched_t2
+    scheduler: none
+    warmup_steps: 0
+    epochs: 100
+    save_best_by: dev_token_acc
+    eval_task1_every: 5
+    eval_task2_every: 5
+    eval_beam_width: 4
+    eval_candidate_pool: 5
+    completion_prefix_min: 0.6
+    completion_prefix_max: 0.8
+    note: modern nosched (T1 winner) + prefix training for T2
+
+  - run_name: h_mod_nosched_s7_mrr
+    scheduler: none
+    warmup_steps: 0
+    epochs: 80
+    save_best_by: dev_mrr
+    eval_task1_every: 1
+    eval_task2_every: 5
+    seed: 7
+    note: T1 winner recipe, seed 7 sanity check (80 ep)

@@ -2,7 +2,9 @@
 #
 # Wave 1 signal (from artifacts/sweeps/LEADERBOARD_FINAL.csv):
 #   Task 1 leader: f_drop15_100_mrr   (MRR 0.8731, top1 0.7483, best_epoch 84)
-#   Task 2 leader: f_extras_1x_100_t2 (dev_token_acc 0.4511, best_epoch 65)
+# Wave 2 result (2026-05-31):
+#   Task 1 leader: f_drop15_100_mrr      (MRR 0.8731 — unchanged from Wave 1)
+#   Task 2 leader: g_drop15_nosched_t2   (dev_token_acc 0.4545, best_epoch 80)
 #   Negative result: f_extras_500_100_mrr WORSE than 1x — stop chasing extras volume.
 #
 # This grid: drop15 ± neighbours, drop15 × Task-2 selection, drop15 longer.
