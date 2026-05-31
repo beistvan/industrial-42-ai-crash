@@ -4,6 +4,7 @@ STREAMLIT_PORT ?= 8501
 .PHONY: setup setup-cpu check-env check-torch check-app test test-strict lint \
 	run-dashboard dashboard smoke dev-split train-ngram generate-extra-local \
 	local-eval predict-dev train-transformer-smoke predict-dev-transformer \
+	rehearsal-train validate-artifacts eval-matrix \
 	leonardo-leaderboard-final regenerate-submission leonardo-status slides-pdf
 
 # --- Environment ---
@@ -82,6 +83,23 @@ predict-dev-transformer: check-torch
 		--eval-valid data/processed/dev_eval/eval_input_valid_dev.csv \
 		--eval-anomaly data/processed/dev_eval/eval_input_anomaly_dev.csv \
 		--out-dir $(TRANSFORMER_OUT)
+
+# --- Pre-flight rehearsal + artifact validation (before Slurm sweeps) ---
+
+rehearsal-train: check-torch dev-split
+	$(PYTHON) scripts/rehearsal_train.py --device cuda
+
+rehearsal-train-cpu: dev-split
+	$(PYTHON) scripts/rehearsal_train.py --device cpu
+
+validate-artifacts:
+	$(PYTHON) scripts/validate_artifacts.py --require-ngram
+
+eval-matrix: dev-split
+	$(PYTHON) scripts/run_eval_matrix.py --device cuda
+
+eval-matrix-cpu: dev-split
+	$(PYTHON) scripts/run_eval_matrix.py --device cpu
 
 # --- Submission (final picks frozen) ---
 

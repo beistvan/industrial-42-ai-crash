@@ -1,16 +1,13 @@
-"""Smoke test for the real-data n-gram pipeline.
-
-Verifies that:
-  - core docs and the Streamlit demo entry exist,
-  - `make dev-split` produced split id files + dev eval inputs from the
-    real Infineon training_data,
-  - `make train-ngram` produced `artifacts/ngram_metrics.json` with
-    Task 1 / Task 2 / Task 3 numbers wired up.
-"""
+"""Smoke test for the real-data n-gram pipeline."""
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 REQUIRED_FILES = [
     Path("README.md"),
@@ -60,12 +57,20 @@ def main() -> None:
     if total_train <= 0:
         _fail("train_ids.json has no sequences")
 
+    try:
+        from src.eval.schema_validation import validate_all_artifacts
+
+        report = validate_all_artifacts(Path("."), require_ngram_metrics=True)
+        print(f"  artifact schema check: {len(report['checked'])} paths OK")
+    except Exception as exc:
+        _fail(f"artifact schema validation: {exc}")
+
     print(
         "Smoke test passed:\n"
         f"  train sequences (real data): {total_train}\n"
         f"  Task 1 top-1: {t1.get('top1'):.3f}  top-5: {t1.get('top5'):.3f}\n"
         f"  Task 2 token_acc: {t2.get('token_accuracy'):.3f}  "
-        f"edit_dist: {t2.get('normalized_edit_distance'):.3f}\n"
+        f"NED: {t2.get('normalized_edit_distance'):.3f}\n"
         f"  Task 3 F1(invalid): {t3.get('f1_invalid'):.3f}  "
         f"rule_attr: {t3.get('rule_attribution_accuracy'):.3f}\n"
         "  Note: Task 3 F1=1.000 is expected on this local dev set because "

@@ -32,6 +32,10 @@ Last updated: **2026-05-31** (submission **final**)
 | `make_dev_split.py` | Build dev holdout |
 | `generate_extra_sequences.py` | Synthetic augmentation |
 | `check_environment.py` | Torch / deps smoke check |
+| `rehearsal_train.py` | Pre-flight tiny train+eval before Slurm sweeps |
+| `validate_artifacts.py` | Schema checks on dev CSVs and metrics JSON |
+| `run_eval_matrix.py` | 4-arm eval matrix (baseline → hybrid) |
+| `smoke_test.py` | End-to-end CPU smoke after `make smoke` |
 
 ### Leonardo / Slurm (`scripts/leonardo/`)
 
@@ -45,13 +49,17 @@ Last updated: **2026-05-31** (submission **final**)
 ### Makefile shortcuts
 
 ```bash
-make leonardo-leaderboard-final   # refresh LEADERBOARD_FINAL.csv
-make regenerate-submission        # Slurm predict → result/submission/
-make dashboard                    # unified Streamlit UI (avoid Live demo on login node)
+make dev-split && make train-ngram && make validate-artifacts
+make rehearsal-train                # optional before new sweeps
+make eval-matrix                    # after checkpoints exist
+make leonardo-leaderboard-final     # refresh LEADERBOARD_FINAL.csv
+make regenerate-submission          # Slurm predict → result/submission/
+make dashboard                      # unified Streamlit UI
 bash scripts/leonardo/status_now.sh
 ```
 
-Winning recipes: [`configs/sweeps/WINNING_RECIPES.md`](../configs/sweeps/WINNING_RECIPES.md)
+Winning recipes: [`configs/sweeps/WINNING_RECIPES.md`](../configs/sweeps/WINNING_RECIPES.md)  
+Pipeline workflow: [`docs/ENGINEERING_PRACTICES.md`](../docs/ENGINEERING_PRACTICES.md)
 
 ---
 

@@ -25,8 +25,8 @@ process-rule violations.
 
 | Level | What | Status | Dev headline |
 |---|---|---|---|
-| **1** | Data + n-gram baseline | ✅ done | MRR 0.807 · tok 0.421 |
-| **2** | Train → tune → benchmark | ✅ done | MRR **0.874** · tok **0.455** |
+| **1** | Data + n-gram baseline | ✅ done | MRR 0.807 · NED 0.227 |
+| **2** | Train → tune → benchmark | ✅ done | MRR **0.874** · NED **0.223** |
 | **3** | Scaling + modern architecture | ✅ done | Wave 3 broke T1 plateau |
 
 **Baseline → trained → optimized:** n-gram → Wave 1 Transformer → Wave 3 modern T1 + Wave 2 T2 specialist.
@@ -80,13 +80,28 @@ the hybrid is a single `cp completion.csv` swap.
 
 ---
 
+## 4-arm eval matrix (demo framing)
+
+| Arm | Configuration | Dev headline |
+|---|---|---|
+| **A** | N-gram baseline | MRR 0.807 · NED 0.227 |
+| **B** | T1 Transformer (`h_mod_nosched_mrr`) | MRR 0.874 |
+| **C** | T2 specialist + rule beam | NED **0.223** |
+| **D** | **Submission hybrid** | MRR 0.874 · NED **0.223** |
+
+Regenerate: `make eval-matrix` · Dashboard tab **Eval matrix**.
+
+**Task 2:** NED (normalized edit distance) is the fab-cost metric — lower = closer recipe.
+
+---
+
 ## Results — baseline vs trained vs optimized
 
-| Stage | Model | Task 1 MRR | Task 1 Top-1 | Task 2 tok-acc |
-|---|---|---:|---:|---:|
-| Level 1 baseline | n-gram | 0.807 | 0.687 | 0.421 |
-| Level 2 trained | Wave 1 Transformer | 0.873 | 0.748 | 0.437 |
-| **Submission** | Wave 3 T1 + Wave 2 T2 | **0.874** | **0.75** | **0.455** |
+| Stage | Model | Task 1 MRR | Task 1 Top-1 | Task 2 tok-acc | Task 2 NED ↓ |
+|---|---|---:|---:|---:|---:|
+| Level 1 baseline | n-gram | 0.807 | 0.687 | 0.421 | 0.227 |
+| Level 2 trained | Wave 1 Transformer | 0.873 | 0.748 | 0.437 | 0.216 |
+| **Submission** | Wave 3 T1 + Wave 2 T2 | **0.874** | **0.75** | **0.455** | **0.223** |
 
 - **Top-5 = 1.000** on Task 1 — correct next step always in top 5.
 - **+6.3 pp Top-1 over n-gram** on the same dev split.
@@ -144,7 +159,8 @@ More augmentation diverged from real distribution.
 
 - **Repo (public, MIT):** github.com/beistvan/industrial-42-ai-crash · branch `wave1-submission`
 - **One-command quickstart**: `make dev-split && make train-ngram && pytest -q` (~5 min, CPU)
-- **Dashboard**: `make run-dashboard` — overview, leaderboard, training curves
+- **Dashboard**: `make run-dashboard` — overview, **eval matrix**, leaderboard, training curves
+- **Pre-flight**: `make rehearsal-train` before Slurm sweeps (`REHEARSE=1 bash scripts/leonardo/submit_sweep.sh …`)
 - **REPORT.md** + per-run JSONs + judge-format submission CSVs all checked in.
 
 > **Submission is shipped. The pipeline is reusable. Everything is honest about

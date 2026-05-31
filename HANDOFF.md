@@ -185,6 +185,16 @@ make run-dashboard
 
 See `docs/LEONARDO_GPU_RUNBOOK.md` for full Leonardo reproduction.
 
+### Pre-flight (before new sweeps)
+
+See `docs/ENGINEERING_PRACTICES.md` for the full checklist:
+
+```bash
+make validate-artifacts
+make rehearsal-train              # or REHEARSE=1 on submit_sweep.sh
+make eval-matrix                    # after checkpoints exist
+```
+
 ---
 
 ## Key repo files for teammate
@@ -197,6 +207,7 @@ See `docs/LEONARDO_GPU_RUNBOOK.md` for full Leonardo reproduction.
 | `scripts/regenerate_submission.sh` | Re-pick T1/T2 from leaderboard + predict |
 | `EVAL_DATA/` | Organizer eval inputs |
 | `docs/LEONARDO_GPU_RUNBOOK.md` | Leonardo reproduction runbook |
+| `docs/ENGINEERING_PRACTICES.md` | Pipeline workflow (rehearsal, eval matrix, schema checks) |
 | `configs/sweeps/leonardo_fine.yaml` | Wave-2 fine grid (completed) |
 | `configs/sweeps/leonardo_modern.yaml` | Wave-3 modern architecture |
 | `configs/sweeps/leonardo_task2.yaml` | Wave-4 Task-2 prefix training |

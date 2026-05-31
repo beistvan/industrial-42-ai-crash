@@ -22,6 +22,7 @@ artifacts/sweeps/                     Per-run metrics + LEADERBOARD_FINAL
 data/raw/infineon/                    Organizer-provided source data
 data/generated/infineon/              Synthetic augmentation (deterministic, manifest.json)
 docs/                                 ADRs, data spec, Leonardo GPU runbook, submission notes
+docs/ENGINEERING_PRACTICES.md         Pipeline workflow & engineering practices
 slides/                               Pitch deck (PPTX; see slides/README.md for PDF)
 REPORT.md, README.md, LICENSE         Required jury deliverables
 requirements.txt, Makefile            Reproducibility
@@ -58,7 +59,7 @@ pip install --index-url https://download.pytorch.org/whl/cpu torch
 python scripts/check_environment.py --require-torch
 make dev-split           # builds data/processed/splits/ and dev_eval/
 make train-ngram         # baseline; ~2 minutes
-pytest -q                # ~33 tests, all should pass
+pytest -q                # ~47 tests, all should pass
 ```
 
 The repo includes everything **except model checkpoints** (they're ~140 MB and
@@ -115,6 +116,7 @@ On Leonardo (or any Slurm A100 cluster), use `scripts/leonardo/submit_sweep.sh` 
 - **Task 2** still leaves >50% of completion tokens incorrect — rule-constrained beam=5 helps but `token_accuracy` is structurally limited by the model's medium scale.
 - **Task 3** uses rule validator for detection + **T1 LM log-prob SCORE** (`src/eval/anomaly_scoring.py`); F1=1.00 on dev because rules separate cleanly.
 - **No pre-trained LLM** — see `docs/ADRs/0001-no-hf-pretrained.md` for why.
+- **Pipeline workflow** — rehearsal gate, 4-arm eval matrix, artifact validation; see `docs/ENGINEERING_PRACTICES.md`.
 
 ## License
 

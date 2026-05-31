@@ -17,7 +17,21 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.eval.run_eval import evaluate_all  # noqa: E402
+from src.eval.schema_validation import validate_local_eval_payload  # noqa: E402
 from src.ml import load_sequence_model  # noqa: E402
+
+
+def _write_skipped(out: Path, *, model: Path, reason: str) -> None:
+    payload = {
+        "status": "skipped",
+        "reason": reason,
+        "model": {"path": str(model), "exists": model.exists()},
+        "metrics": None,
+    }
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    print(json.dumps(payload, indent=2))
+    print(f"wrote {out} (status=skipped)")
 
 
 def main() -> None:
@@ -40,13 +54,19 @@ def main() -> None:
                         help="Disable rule-constrained completion.")
     parser.add_argument("--candidate-pool", type=int, default=5,
                         help="Top-k pool per step when rule_constrained is on.")
+    parser.add_argument(
+        "--allow-missing",
+        action="store_true",
+        help="If the checkpoint is missing, write a skipped stub JSON instead of exiting.",
+    )
     args = parser.parse_args()
 
     if not args.model.exists():
-        raise SystemExit(
-            f"Missing model file: {args.model}\n"
-            "Run: python scripts/train_ngram.py"
-        )
+        msg = f"Missing model file: {args.model}"
+        if args.allow_missing:
+            _write_skipped(args.out, model=args.model, reason=msg)
+            return
+        raise SystemExit(f"{msg}\nRun: python scripts/train_ngram.py")
     required = [
         args.eval_dir / "eval_input_valid_dev.csv",
         args.eval_dir / "eval_input_valid_dev_gold.csv",
@@ -67,7 +87,8 @@ def main() -> None:
         candidate_pool=args.candidate_pool,
     ).to_dict()
     stats = model.stats() if hasattr(model, "stats") else {"model": type(model).__name__}
-    payload = {"model": stats, "metrics": metrics}
+    payload = {"status": "ok", "model": stats, "metrics": metrics}
+    validate_local_eval_payload(payload, path=str(args.out))
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(json.dumps(payload, indent=2))

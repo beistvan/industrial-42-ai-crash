@@ -1,12 +1,15 @@
 """View sections for the unified Track 1 dashboard."""
 from __future__ import annotations
 
+import sys
+
 import streamlit as st
 import pandas as pd
 
 from src.app.dashboard_charts import render_training_charts
 from src.app.dashboard_data import (
     DEV_EVAL_DIR,
+    EVAL_MATRIX_PATH,
     EVAL_PROTOCOL,
     JUDGE_EVAL_DIR,
     LEADERBOARD_MD,
@@ -14,6 +17,7 @@ from src.app.dashboard_data import (
     NGRAM_METRICS,
     REPO_ROOT,
     SUBMISSION_DIR,
+    load_eval_matrix,
     load_json,
     metrics_sections,
     model_config_table,
@@ -26,7 +30,15 @@ from src.app.dashboard_data import (
     training_history_df,
     wave_label,
 )
-from src.app.track_context import BASELINE, LEVELS, SUBMISSION, TRACK_ALIGNMENT, TRACK_DOC_URL
+from src.app.track_context import (
+    BASELINE,
+    EVAL_ARMS,
+    FLOOR_BASELINES,
+    LEVELS,
+    SUBMISSION,
+    TRACK_ALIGNMENT,
+    TRACK_DOC_URL,
+)
 
 
 def render_task_metrics(t1: dict, t2: dict, t3: dict, *, caption: str) -> None:
@@ -231,3 +243,67 @@ def render_training(df: pd.DataFrame | None) -> None:
 
     with st.expander("Full metrics JSON"):
         st.json(payload)
+
+
+def render_eval_matrix() -> None:
+    st.subheader("4-arm eval matrix")
+    st.markdown(
+        "Before/after comparison on the **dev holdout** — same framing as the pitch deck. "
+        "Arm **D** is the shipped hybrid. Regenerate: `make eval-matrix`."
+    )
+
+    for arm in EVAL_ARMS:
+        st.caption(f"**Arm {arm['arm_id']}** — {arm['label']} (`{arm['model_hint']}`)")
+
+    payload = load_eval_matrix()
+    if payload is None:
+        st.warning(
+            "No eval matrix JSON yet. Run `make eval-matrix` (needs dev split + checkpoints)."
+        )
+        if st.button("Run eval matrix now", key="run_matrix_btn"):
+            import subprocess
+
+            with st.spinner("Running 4-arm matrix…"):
+                subprocess.run(
+                    [sys.executable, str(REPO_ROOT / "scripts" / "run_eval_matrix.py")],
+                    cwd=REPO_ROOT,
+                    check=False,
+                )
+            st.rerun()
+        return
+
+    from src.eval.eval_matrix import matrix_comparison_table
+
+    rows = matrix_comparison_table(payload)
+    display = pd.DataFrame(rows)
+    for col in ("task1_mrr", "task1_top1", "task2_tok_acc", "task2_ned", "task3_f1"):
+        if col in display.columns:
+            display[col] = display[col].round(4)
+    st.dataframe(display, hide_index=True, width="stretch")
+
+    summary = payload.get("summary", {})
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Arms OK", summary.get("arms_ok", 0))
+    c2.metric("Unavailable", summary.get("arms_unavailable", 0))
+    c3.metric("Best T1 arm", summary.get("best_task1_mrr_arm", "—"))
+
+    st.markdown("**Task 2 headline: NED (lower = closer recipe)** — the fab-cost metric.")
+    ned_rows = [r for r in rows if r.get("status") != "unavailable" and r.get("task2_ned") is not None]
+    if ned_rows:
+        best = min(ned_rows, key=lambda r: r["task2_ned"])
+        base_ned = next((r["task2_ned"] for r in rows if r["arm"] == "A"), None)
+        sub_ned = next((r["task2_ned"] for r in rows if r["arm"] == "D"), None)
+        m1, m2, m3 = st.columns(3)
+        if base_ned is not None:
+            m1.metric("Arm A NED (baseline)", f"{base_ned:.4f}")
+        if sub_ned is not None:
+            m2.metric("Arm D NED (submission)", f"{sub_ned:.4f}")
+            if base_ned is not None:
+                m3.metric("Δ NED vs baseline", f"{sub_ned - base_ned:+.4f}")
+        st.caption(f"Lowest NED among available arms: **{best['arm']}** ({best['task2_ned']:.4f})")
+
+    with st.expander("Floor baselines (honest limits)"):
+        st.json(FLOOR_BASELINES, expanded=False)
+
+    if EVAL_MATRIX_PATH.exists():
+        st.caption(f"Source: `{repo_path(EVAL_MATRIX_PATH)}`")

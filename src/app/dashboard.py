@@ -18,6 +18,7 @@ if str(REPO_ROOT) not in sys.path:
 from src.app.dashboard_data import load_leaderboard  # noqa: E402
 from src.app.dashboard_live import render_live_demo  # noqa: E402
 from src.app.dashboard_views import (  # noqa: E402
+    render_eval_matrix,
     render_leaderboard,
     render_overview,
     render_training,
@@ -46,8 +47,9 @@ for col, lvl in zip(cols, LEVELS):
 
 df = load_leaderboard()
 
-tab_overview, tab_leaderboard, tab_training, tab_live = st.tabs([
+tab_overview, tab_matrix, tab_leaderboard, tab_training, tab_live = st.tabs([
     "Overview",
+    "Eval matrix",
     "Leaderboard",
     "Training & config",
     "Live demo",
@@ -55,6 +57,9 @@ tab_overview, tab_leaderboard, tab_training, tab_live = st.tabs([
 
 with tab_overview:
     render_overview(df)
+
+with tab_matrix:
+    render_eval_matrix()
 
 with tab_leaderboard:
     if df is not None:

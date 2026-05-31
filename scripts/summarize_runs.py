@@ -54,11 +54,17 @@ def _row_from_payload(name: str, payload: dict) -> dict:
     if not task2_ned and t2_final:
         task2_ned = float(t2_final.get("normalized_edit_distance", 0.0) or 0.0)
 
+    ckpt_path = payload.get("best", {}).get("path")
+    checkpoint_status = "unknown"
+    if ckpt_path:
+        checkpoint_status = "ok" if Path(ckpt_path).exists() else "missing"
+
     return {
         "run": name,
         "best_metric": best_metric,
         "best_value": best_value,
         "best_epoch": best.get("epoch"),
+        "checkpoint_status": checkpoint_status,
         "task1_best_epoch": task1_best["epoch"],
         "task1_top1": round(task1_best.get("top1", 0.0) or 0.0, 4),
         "task1_top5": round(task1_best.get("top5", 0.0) or 0.0, 4),
@@ -115,7 +121,7 @@ def main() -> None:
           ""]
     headers = ["run", "task1_top1", "task1_top5", "task1_mrr",
                "task2_token_acc", "task2_ned", "task3_rule_attr",
-               "best_value", "best_epoch", "train_seconds", "extras"]
+               "checkpoint_status", "best_value", "best_epoch", "train_seconds", "extras"]
     md.append("| " + " | ".join(headers) + " |")
     md.append("|" + "|".join(["---"] * len(headers)) + "|")
     for r in rows:

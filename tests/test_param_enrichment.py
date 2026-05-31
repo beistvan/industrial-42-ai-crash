@@ -1,4 +1,4 @@
-"""Tests for Wave 5 parameter enrichment."""
+"""Tests for optional fab-parameter token enrichment (training-time only)."""
 from __future__ import annotations
 
 from src.data.param_enrichment import (

@@ -77,7 +77,8 @@ python -m pytest -q --tb=no \
     tests/test_infineon_dev_split.py \
     tests/test_transformer_model.py \
     tests/test_sweep_transformer.py \
-    tests/test_smoke.py
+    tests/test_sweep_picks.py \
+    tests/test_anomaly_scoring.py
 
 echo "=== Sweep row count (shortlist) ==="
 N=$(python scripts/sweep_transformer.py \

@@ -8,6 +8,7 @@
 #   SWEEP_CONCURRENCY  max simultaneous array tasks (default 32)
 #   SLURM_ACCOUNT      CINECA account (default EUHPC_D30_031)
 #   SLURM_RESERVATION  optional reservation name (unset = no reservation)
+#   REHEARSE=1         run scripts/rehearsal_train.py before sbatch
 set -euo pipefail
 
 YAML="${1:?usage: submit_sweep.sh SWEEP.yaml [STAGE]}"
@@ -39,6 +40,12 @@ if [[ -n "${SLURM_RESERVATION:-}" ]]; then
 fi
 
 echo "Submitting ${YAML} (${STAGE}): ${N} rows, concurrency=${CONCURRENCY}, account=${ACCOUNT}"
+
+if [[ "${REHEARSE:-0}" == "1" ]]; then
+    echo "REHEARSE=1 — running training rehearsal before sweep submit"
+    python3 scripts/rehearsal_train.py --device cuda
+fi
+
 JOB_OUT=$(sbatch "${SBATCH_ARGS[@]}" scripts/leonardo/sweep_array.slurm "$YAML" "$STAGE")
 echo "$JOB_OUT"
 JOB_ID=$(echo "$JOB_OUT" | awk '{print $NF}')

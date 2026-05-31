@@ -12,6 +12,7 @@ from src.app.track_context import BASELINE, PIPELINE_WAVES
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SWEEPS_DIR = REPO_ROOT / "artifacts" / "sweeps"
+EVAL_MATRIX_PATH = REPO_ROOT / "artifacts" / "eval_matrix_latest.json"
 LEADERBOARD_CSV = SWEEPS_DIR / "LEADERBOARD_FINAL.csv"
 LEADERBOARD_MD = SWEEPS_DIR / "LEADERBOARD_FINAL.md"
 NGRAM_METRICS = REPO_ROOT / "artifacts" / "ngram_metrics.json"
@@ -60,6 +61,17 @@ def load_json(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_eval_matrix() -> dict[str, Any] | None:
+    """Latest 4-arm matrix, or newest eval_matrix-*.json in artifacts/."""
+    if EVAL_MATRIX_PATH.exists():
+        return load_json(EVAL_MATRIX_PATH)
+    artifacts = REPO_ROOT / "artifacts"
+    candidates = sorted(artifacts.glob("eval_matrix-*.json"), reverse=True)
+    if candidates:
+        return load_json(candidates[0])
+    return None
 
 
 def load_leaderboard() -> pd.DataFrame | None:
@@ -137,6 +149,7 @@ def progress_table(df: pd.DataFrame) -> pd.DataFrame:
         "model": "n-gram (order 12)",
         "task1_mrr": BASELINE["task1_mrr"],
         "task2_tok_acc": BASELINE["task2_token_acc"],
+        "task2_ned": BASELINE["task2_ned"],
         "task3_rule_attr": BASELINE.get("task3_rule_attr"),
     }]
     for stage, run, tag in (
@@ -150,6 +163,7 @@ def progress_table(df: pd.DataFrame) -> pd.DataFrame:
                 "model": f"{run} ({tag})",
                 "task1_mrr": round(score_task1(rec), 4),
                 "task2_tok_acc": round(score_task2(rec), 4),
+                "task2_ned": rec.get("task2_ned"),
                 "task3_rule_attr": rec.get("task3_rule_attr"),
             })
     t1_run = pick_task1_run(df.to_dict("records"))
@@ -160,6 +174,7 @@ def progress_table(df: pd.DataFrame) -> pd.DataFrame:
         "model": f"{t1_run} + {t2_run}",
         "task1_mrr": round(score_task1(t1_rec), 4),
         "task2_tok_acc": round(score_task2(t2_rec), 4),
+        "task2_ned": t2_rec.get("task2_ned"),
         "task3_rule_attr": t1_rec.get("task3_rule_attr"),
     })
     return pd.DataFrame(rows)

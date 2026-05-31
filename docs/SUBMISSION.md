@@ -117,6 +117,10 @@ python scripts/sweep_transformer.py \
 
 On Leonardo, submit sweeps via `scripts/leonardo/submit_sweep.sh` — see [`docs/LEONARDO_GPU_RUNBOOK.md`](LEONARDO_GPU_RUNBOOK.md).
 
+**Pre-flight (recommended):** `make rehearsal-train` or `REHEARSE=1 bash scripts/leonardo/submit_sweep.sh …`  
+**4-arm demo matrix:** `make eval-matrix` · dashboard tab **Eval matrix**  
+**Pipeline workflow:** [`docs/ENGINEERING_PRACTICES.md`](ENGINEERING_PRACTICES.md)
+
 **Generate judge CSVs:**
 
 ```bash

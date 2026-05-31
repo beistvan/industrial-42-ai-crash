@@ -13,8 +13,6 @@ venv/
 /data/raw/*
 /data/interim/*
 /data/processed/*
-/runs/*
-/checkpoints/*
 /artifacts/*
 
 # Keep folder structure
@@ -22,8 +20,6 @@ venv/
 !/data/interim/.gitkeep
 !/data/processed/.gitkeep
 !/models/.gitkeep
-!/runs/.gitkeep
-!/checkpoints/.gitkeep
 !/artifacts/.gitkeep
 
 # Keep sweep leaderboard metadata so teammates can read it without rsync

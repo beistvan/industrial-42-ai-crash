@@ -1,6 +1,6 @@
 # REPORT — Industrial AI (Infineon)
 
-**Team**: Andrija Jovanovic, Istvan Beregszaszi, Thánh Trung Nguyen
+**Team**: Andrija Jovanovic, Istvan Beregszaszi, Thanh Trung Nguyen
 **Track**: Industrial AI (Infineon)
 **Repo**: https://github.com/beistvan/industrial-42-ai-crash (branch: `wave1-submission`)
 **License**: MIT
@@ -28,18 +28,18 @@ Structured by [Track 1 Levels](https://docs.zero-one.lumos-consulting.at/tracks/
 
 | Level | Requirement | What we did | Headline (dev) |
 |---|---|---|---|
-| **Level 1** | Data + baseline | 3k official sequences + 750 synthetic extras; n-gram suffix-backoff (order 12) | MRR **0.807**, tok **0.421** |
-| **Level 2** | Train → tune → visible benchmark | Vanilla Transformer Waves 1–2; 27-run dev leaderboard; unified dashboard | MRR **0.874**, tok **0.455** |
-| **Level 3** | Scaling / architecture | Extras scaling (1× helps, 2×/500 hurts); Wave 3 RoPE/RMSNorm/SwiGLU **done**; Wave 4 T2 prefix **no gain** | MRR **0.874**, tok **0.455** |
+| **1** | Data + baseline | 3k official sequences + 750 synthetic extras; n-gram suffix-backoff (order 12) | MRR **0.807**, NED **0.227** |
+| **Level 2** | Train → tune → visible benchmark | Vanilla Transformer Waves 1–2; 27-run dev leaderboard; unified dashboard | MRR **0.874**, NED **0.223** |
+| **Level 3** | Scaling / architecture | Extras scaling (1× helps, 2×/500 hurts); Wave 3 RoPE/RMSNorm/SwiGLU **done**; Wave 4 T2 prefix **no gain** | MRR **0.874**, NED **0.223** |
 
 **Baseline → trained → optimized:**
 
-| Stage | Model | Task 1 MRR | Task 2 tok-acc | Δ vs baseline |
+| Stage | Model | Task 1 MRR | Task 2 NED ↓ | Δ vs baseline |
 |---|---|---:|---:|---|
-| Level 1 baseline | n-gram | 0.807 | 0.421 | — |
-| Level 2 trained | `f_drop15_100_mrr` (Wave 1) | **0.873** | 0.437 | +6.6 pp MRR |
-| Level 2 optimized | `g_drop15_nosched_t2` (Wave 2 T2) | 0.867 | **0.455** | +3.4 pp tok |
-| **Submission hybrid** | `h_mod_nosched_mrr` + `g_drop15_nosched_t2` | **0.874** | **0.455** | Wave 3 T1 + Wave 2 T2 |
+| Level 1 baseline | n-gram | 0.807 | 0.227 | — |
+| Level 2 trained | `f_drop15_100_mrr` (Wave 1) | **0.873** | 0.216 | −0.011 NED |
+| Level 2 optimized | `g_drop15_nosched_t2` (Wave 2 T2) | 0.867 | **0.223** | −0.004 NED |
+| **Submission hybrid** | `h_mod_nosched_mrr` + `g_drop15_nosched_t2` | **0.874** | **0.223** | Wave 3 T1 + Wave 2 T2 |
 
 ---
 
@@ -179,11 +179,43 @@ plain CLI rows via `--row N`.
 
 ### Baseline vs transformer (all three tasks)
 
-| Model | Task 1 MRR | Task 2 tok-acc | Task 3 F1 |
-|---|---:|---:|---:|
-| N-gram suffix-backoff (order 12) | 0.807 | 0.421 | 1.00 |
-| Transformer Wave-1 (T1 specialist) | **0.873** | 0.437 | 1.00 |
-| **Hybrid Wave 3+2** | **0.874** | **0.455** | 1.00 |
+| Model | Task 1 MRR | Task 2 tok-acc | Task 2 NED ↓ | Task 3 F1 |
+|---|---:|---:|---:|---:|
+| N-gram suffix-backoff (order 12) | 0.807 | 0.421 | **0.227** | 1.00 |
+| Transformer Wave-1 (T1 specialist) | **0.873** | 0.437 | 0.216 | 1.00 |
+| **Hybrid Wave 3+2** | **0.874** | **0.455** | **0.223** | 1.00 |
+
+**Task 2 headline metric:** normalized edit distance (NED) — lower means the
+predicted fab recipe is closer to gold. Token-accuracy alone understates
+completion quality when step strings differ in length or wording.
+
+### 4-arm eval matrix (dev holdout)
+
+Structured before/after comparison for demos and the dashboard (`make eval-matrix`):
+
+| Arm | Stack | Role |
+|---|---|---|
+| **A** | N-gram baseline | Level 1 floor |
+| **B** | `h_mod_nosched_mrr` | T1 specialist (all tasks) |
+| **C** | `g_drop15_nosched_t2` | T2 specialist + rule beam |
+| **D** | T1 + T2 hybrid | **Shipped submission** |
+
+Missing checkpoints are reported as `status: unavailable` — the matrix completes
+without silent degradation.
+
+### Floor baselines (honest limits)
+
+| Reference | Source | What it bounds |
+|---|---|---|
+| N-gram MRR 0.807 / NED 0.227 | This repo, dev holdout | Level 1 — must beat to claim Transformer value |
+| Task 3 F1 = 1.00 (validator) | Organizer `validate_sequence()` grammar | Upper bound for rules-only detection on dev (injected violations) |
+| Task 3 LM SCORE | T1 checkpoint log-prob | Continuous ranking signal only — not a separate model |
+| Synthetic generator | `data/raw/infineon/training_data/generate_sequences.py` | Produces *valid* sequences; cannot invent novel failure modes |
+
+We do **not** use HuggingFace pretrained LLMs — see `docs/ADRs/0001-no-hf-pretrained.md`.
+Pre-flight before GPU sweeps: `make rehearsal-train` (~5 min, tiny model + schema check).
+
+Pipeline workflow details: [`docs/ENGINEERING_PRACTICES.md`](docs/ENGINEERING_PRACTICES.md).
 
 ### Baseline vs transformer (Task 1 detail)
 
@@ -303,7 +335,7 @@ Mapped to the [Zero One Track 1](https://docs.zero-one.lumos-consulting.at/track
 | **MVP:** documented benchmark | ✅ | `LEADERBOARD_FINAL`, `REPORT.md`, per-run JSONs |
 | **Stretch:** multiple architectures | ✅ | Vanilla + Wave 3 modern stack (`h_mod_nosched_mrr`) |
 | **Stretch:** scaling effects | ✅ | Level 3 data scaling table (1× helps, 2×/500 hurts) |
-| **Stretch:** demonstrator (before/after) | ✅ | `make run-dashboard` — Overview / Training tabs |
+| **Stretch:** demonstrator (before/after) | ✅ | `make run-dashboard` — **Eval matrix** tab (arms A–D) + Live demo |
 | **Stretch:** optional process parameters | ⏭ skipped | Wave 5 not needed — Wave 3 beat T1 bar |
 | **Stretch:** OOD / modified sequences | ⏳ judge | Task 4 evaluated by organizers on hidden set |
 | **Stretch:** model size ladder | ⏳ | ~4M params only; larger config scaffolded, not run |
@@ -312,6 +344,22 @@ Mapped to the [Zero One Track 1](https://docs.zero-one.lumos-consulting.at/track
 
 Submission is **final** — hybrid `h_mod_nosched_mrr` + `g_drop15_nosched_t2`.
 Re-run `make regenerate-submission` only if a new sweep beats the current picks.
+
+---
+
+## Operational & engineering practices
+
+| Practice | Command / artifact | Purpose |
+|---|---|---|
+| Persisted dev split | `make dev-split` | Same holdout for all models and evaluators |
+| Artifact schema validation | `make validate-artifacts` | Catch CSV/JSON format drift before sweeps |
+| Training rehearsal | `make rehearsal-train` · `REHEARSE=1 submit_sweep.sh` | Tiny end-to-end train+eval before Slurm array |
+| 4-arm eval matrix | `make eval-matrix` · dashboard **Eval matrix** tab | Pitch-ready before/after (A baseline → D hybrid) |
+| Graceful skip | `local_eval --allow-missing` · matrix `status: unavailable` | Leaderboard/regen never silently omits a failed arm |
+| Business-aligned metric | NED headline for Task 2 | Lower edit distance = closer fab recipe (not just token %) |
+| Floor baselines | N-gram floor, T3 validator ceiling | Honest limits documented in results section |
+
+Full workflow: [`docs/ENGINEERING_PRACTICES.md`](docs/ENGINEERING_PRACTICES.md).
 
 ---
 
