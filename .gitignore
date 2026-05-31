@@ -29,9 +29,9 @@ venv/
 
 # Keep sweep leaderboard metadata so teammates can read it without rsync
 !/artifacts/sweeps/
-!/artifacts/sweeps/LEADERBOARD.csv
-!/artifacts/sweeps/LEADERBOARD.md
-!/artifacts/sweeps/m_*.json
+!/artifacts/sweeps/LEADERBOARD*.csv
+!/artifacts/sweeps/LEADERBOARD*.md
+!/artifacts/sweeps/*.json
 
 # Track-provided Infineon data
 !/data/raw/infineon/
@@ -51,11 +51,20 @@ leo_results_gpu.tgz
 _leo_results_gpu/
 *.tgz
 
-# Local/GPU model checkpoints
+# Local/GPU model checkpoints (default: ignore all sweep weights)
 models/*.pt
 models/*.pt.best
+models/sweeps/*
 models/sweeps/*.pt
 models/sweeps/*.pkl
 
-# Keep best sweep checkpoints (tracked via git lfs)
-!models/sweeps/*.pt.best
+# Submission checkpoints only
+!models/sweeps/.gitkeep
+!models/sweeps/h_mod_nosched_mrr.pt.best
+!models/sweeps/g_drop15_nosched_t2.pt.best
+
+# Result scratch (keep final submission CSVs)
+result/.staging_t2/
+result/dev/
+result/reproduce/
+result/reproduce_t2/

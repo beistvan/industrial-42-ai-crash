@@ -13,7 +13,7 @@ python scripts/predict_submission.py \
   --model models/ngram_baseline.pkl \
   --eval-valid   data/raw/infineon/eval/eval_input_valid.csv \
   --eval-anomaly data/raw/infineon/eval/eval_input_anomaly.csv \
-  --out-dir extras/results_dev
+  --out-dir result/dev
 ```
 
 `make_dev_split.py` writes the split ids and dev eval CSVs under
@@ -140,7 +140,7 @@ The shape we write today:
 | `completion.csv` | SEQUENCE_ID, STEP_INDEX (0..n), STEP |
 | `anomaly.csv`    | SEQUENCE_ID, IS_VALID (0/1), PRIMARY_RULE, ALL_RULES |
 
-Files are written to `extras/results_submission/` for judge eval inputs and
-`extras/results_dev/` for local dev-split smoke runs. If the organizers'
+Files are written to `result/submission/` for judge eval inputs and
+`result/dev/` for local dev-split smoke runs. If the organizers'
 `eval_metrics.py` expects a different column layout, adjust the writer in
 `scripts/predict_submission.py` only; nothing else needs to change.

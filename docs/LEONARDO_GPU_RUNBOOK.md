@@ -2,7 +2,7 @@
 
 ## Decision status
 
-Submission baseline is locked in `extras/results_submission/`. Use this for
+Submission baseline is locked in `result/submission/`. Use this for
 demo and jury-facing outputs:
 
 ```bash
@@ -135,7 +135,7 @@ The GPU scripts write:
 ```text
 models/sweeps/*.pt.best
 artifacts/sweeps/*.json
-extras/results_submission/{nextstep,completion,anomaly}.csv
+result/submission/{nextstep,completion,anomaly}.csv
 ```
 
 ## Back-copy results
@@ -153,19 +153,52 @@ Or directly:
 ```bash
 scp -r <USER>@login01-ext.leonardo.cineca.it:$SCRATCH/industrial-infineon/models/sweeps ./models_sweeps_leonardo
 scp -r <USER>@login01-ext.leonardo.cineca.it:$SCRATCH/industrial-infineon/artifacts/sweeps ./artifacts_sweeps_leonardo
-scp -r <USER>@login01-ext.leonardo.cineca.it:$SCRATCH/industrial-infineon/extras/results_submission ./results_submission_leonardo
+scp -r <USER>@login01-ext.leonardo.cineca.it:$SCRATCH/industrial-infineon/result/submission ./results_submission_leonardo
 ```
 
-## Wave-1 submission numbers (dev holdout)
+## Wave 1–2 submission numbers (dev holdout)
 
-| Model | Task 1 Top-1 | Task 1 MRR | Task 2 token-acc |
-|---|---:|---:|---:|
-| N-gram baseline | 0.687 | 0.807 | 0.421 |
-| `f_drop15_100_mrr` (Task 1) | 0.748 | 0.873 | 0.437 |
-| `f_extras_1x_100_t2` (Task 2) | 0.743 | 0.870 | 0.451 |
+| Model | Task 1 Top-1 | Task 1 MRR | Task 2 token-acc | Wave |
+|---|---:|---:|---:|---|
+| N-gram baseline | 0.687 | 0.807 | 0.421 | L1 |
+| `f_drop15_100_mrr` (Task 1) | 0.748 | **0.873** | 0.437 | 1 |
+| `g_drop15_nosched_t2` (Task 2) | 0.738 | 0.867 | **0.455** | 2 |
 
 See [`artifacts/sweeps/LEADERBOARD_FINAL.md`](../artifacts/sweeps/LEADERBOARD_FINAL.md)
-for the full 17-run table.
+for the full 23-run table.
+
+Regenerate submission CSVs after leaderboard updates (Leonardo login node submits
+GPU predict jobs via Slurm — do not load transformers locally):
+
+```bash
+make leonardo-leaderboard-final
+make regenerate-submission
+```
+
+Optional reservation: `SLURM_RESERVATION=s_tra_ncc make regenerate-submission`
+
+## Parallel sweep queue (max GPU use)
+
+Default array concurrency is **32** (was 12). Tune with `SWEEP_CONCURRENCY`.
+
+```bash
+export SWEEP_CONCURRENCY=32
+# export SLURM_RESERVATION=s_tra_ncc   # only if reservation is active
+
+make leonardo-queue-parallel    # Waves 3+4+6 — 24 jobs at once
+make leonardo-watch-pipeline    # auto-rebuild LEADERBOARD_FINAL while jobs run
+
+# When queue drains:
+make leonardo-leaderboard-final && make regenerate-submission
+make run-sweep-dashboard
+```
+
+| Wave | YAML | Rows |
+|---|---|---:|
+| 3 modern | `leonardo_modern.yaml` | 8 |
+| 4 Task-2 | `leonardo_task2.yaml` | 8 |
+| 5 params | `leonardo_params.yaml` | 6 |
+| 6 scale | `leonardo_scale.yaml` | 8 |
 
 ## If a job fails
 

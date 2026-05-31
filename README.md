@@ -10,19 +10,19 @@ anomaly detection against a 10-rule process grammar.
 - **Team**: Andrija Jovanovic, Istvan Beregszaszi, Thánh Trung Nguyen
 - **Track**: Industrial AI (Infineon)
 - **Report**: see [`REPORT.md`](REPORT.md)
-- **Slides**: see [`SLIDES.md`](SLIDES.md) (10-slide narrative; also as PDF/PPTX in `slides/`)
+- **Submission plan**: see [`docs/SUBMISSION.md`](docs/SUBMISSION.md)
 
 ## What's in this repo
 
 ```
 src/, scripts/, tests/, configs/      Code + tests + sweep YAMLs
 EVAL_DATA/                            Judge eval inputs + the official eval_metrics.py
-extras/results_submission/            THE submission (3 judge-format CSVs)
+result/submission/            THE submission (3 judge-format CSVs)
 artifacts/sweeps/                     Per-run metrics + LEADERBOARD_FINAL
 data/raw/infineon/                    Organizer-provided source data
 data/generated/infineon/              Synthetic augmentation (deterministic, manifest.json)
 docs/                                 ADRs, data spec, Leonardo GPU runbook, submission notes
-slides/                               Pitch deck
+slides/                               Pitch deck (PPTX; see slides/README.md for PDF)
 REPORT.md, README.md, LICENSE         Required jury deliverables
 requirements.txt, Makefile            Reproducibility
 ```
@@ -40,7 +40,7 @@ requirements.txt, Makefile            Reproducibility
 |---|---|---:|---:|
 | 1. Next-step | Top-1 | 0.687 | **0.748** |
 | 1. Next-step | MRR | 0.807 | **0.873** |
-| 2. Completion | Token-acc | 0.421 | **0.451** |
+| 2. Completion | Token-acc | 0.421 | **0.455** |
 | 3. Anomaly | F1 (invalid) | — | **1.00** (rule validator) |
 
 Full per-run leaderboard in [`artifacts/sweeps/LEADERBOARD_FINAL.md`](artifacts/sweeps/LEADERBOARD_FINAL.md).
@@ -67,43 +67,36 @@ submission** below.
 
 ## Reproducing the submission
 
-Full retraining of both finalists takes ~90 minutes on a single A100 GPU.
+Full retraining of Wave 1 + Wave 2 picks takes ~2–3 hours on a single A100 GPU.
+Checkpoints already on disk? Regenerate judge CSVs in one step:
+
+```bash
+make leonardo-leaderboard-final   # if metrics JSONs changed
+make regenerate-submission        # picks best T1/T2; Slurm GPU predict on login node
+```
+
+Task 3 (`anomaly.csv`) reuses the **Task-1 checkpoint** for the LM `SCORE` column;
+rule detection is fixed validator logic — no separate Task-3 model to retrain.
+
+Train from scratch:
 
 ```bash
 # 1. Synthetic augmentation (deterministic, 1x extras)
 python scripts/generate_extra_sequences.py \
     --count-per-family 250 --seed 101 --force
 
-# 2. Train Task-1 winner (drop15, 100 epochs, save by dev_mrr)
+# Task 1 leader (Wave 3 modern, row 4)
 python scripts/sweep_transformer.py \
-    --sweep configs/sweeps/leonardo_final.yaml --stage finalists --row 2
-# -> models/sweeps/f_drop15_100_mrr.pt.best
+    --sweep configs/sweeps/leonardo_modern.yaml --stage finalists --row 4
+# -> models/sweeps/h_mod_nosched_mrr.pt.best
 
-# 3. Train Task-2 specialist (drop10, 100 epochs, save by dev_token_acc)
+# Task 2 leader (Wave 2 fine grid, row 4)
 python scripts/sweep_transformer.py \
-    --sweep configs/sweeps/leonardo_final.yaml --stage finalists --row 1
-# -> models/sweeps/f_extras_1x_100_t2.pt.best
+    --sweep configs/sweeps/leonardo_fine.yaml --stage finalists --row 4
+# -> models/sweeps/g_drop15_nosched_t2.pt.best
 
-# 4. Generate hybrid predictions on judge inputs
-python scripts/predict_submission.py \
-    --model models/sweeps/f_drop15_100_mrr.pt.best \
-    --eval-valid EVAL_DATA/eval_input_valid.csv \
-    --eval-anomaly EVAL_DATA/eval_input_anomaly.csv \
-    --out-dir extras/results_reproduce \
-    --rule-constrained --beam-width 5 --candidate-pool 5 --device cuda
-
-python scripts/predict_submission.py \
-    --model models/sweeps/f_extras_1x_100_t2.pt.best \
-    --eval-valid EVAL_DATA/eval_input_valid.csv \
-    --out-dir extras/results_reproduce_t2 \
-    --rule-constrained --beam-width 5 --candidate-pool 5 --device cuda
-
-cp extras/results_reproduce_t2/completion.csv extras/results_reproduce/completion.csv
-
-# 5. Score against ground truth using the judge's script
-python EVAL_DATA/eval_metrics.py --task next-step \
-    --ground-truth <YOUR_GT.csv> \
-    --predictions extras/results_reproduce/nextstep.csv
+# 4. Hybrid predictions on judge inputs
+bash scripts/regenerate_submission.sh
 ```
 
 On Leonardo (or any Slurm A100 cluster), `make leonardo-wave1` submits the full
@@ -119,7 +112,7 @@ On Leonardo (or any Slurm A100 cluster), `make leonardo-wave1` submits the full
 
 ## Honest limits
 
-- **Task 1 plateau ≈ MRR 0.87**: 12-config shortlist sweep + 6 finalists at 100 ep all land within ~2pp. Further gains likely need architecture change (RoPE/SwiGLU/RMSNorm) or much more data.
+- **Task 1 plateau ≈ MRR 0.87**: Wave 1–2 hyperparam sweeps land within ~2pp on Task 1. Wave 2 improved Task 2 (+0.3 pp tok-acc). Further Task-1 gains likely need architecture change (Wave 3) or more data.
 - **Task 2** still leaves >50% of completion tokens incorrect — rule-constrained beam=5 helps but `token_accuracy` is structurally limited by the model's medium scale.
 - **Task 3 SCORE is heuristic** (`1 − n_violations/10`); on the judge eval all invalid sequences contain exactly 1 violation, so AUC = 1.0 by construction.
 - **No pre-trained LLM** — see `docs/ADRs/0001-no-hf-pretrained.md` for why.

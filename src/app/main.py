@@ -25,23 +25,22 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from src.app.track_context import TRACK_DOC_URL  # noqa: E402
 from src.data import FAMILIES, load_all_families  # noqa: E402
+from src.data.step_metadata import describe_step  # noqa: E402
 from src.eval.metrics import normalized_edit_distance, token_accuracy  # noqa: E402
 from src.eval.rule_validator import _validate, classify_sequence  # noqa: E402
 from src.ml import NGramBaseline, load_sequence_model  # noqa: E402
 
 METRIC_CANDIDATES = {
     "ngram_baseline.pkl": REPO_ROOT / "artifacts" / "ngram_metrics.json",
-    "transformer_small.pt": REPO_ROOT / "artifacts" / "transformer_metrics.json",
-    "transformer_smoke.pt": REPO_ROOT / "artifacts" / "transformer_smoke_metrics.json",
-    "f_drop15_100_mrr.pt.best": REPO_ROOT / "artifacts" / "sweeps" / "f_drop15_100_mrr.json",
-    "f_extras_1x_100_t2.pt.best": REPO_ROOT / "artifacts" / "sweeps" / "f_extras_1x_100_t2.json",
+    "h_mod_nosched_mrr.pt.best": REPO_ROOT / "artifacts" / "sweeps" / "h_mod_nosched_mrr.json",
+    "g_drop15_nosched_t2.pt.best": REPO_ROOT / "artifacts" / "sweeps" / "g_drop15_nosched_t2.json",
 }
 DEFAULT_MODEL_PATHS = [
-    REPO_ROOT / "models" / "sweeps" / "f_drop15_100_mrr.pt.best",
-    REPO_ROOT / "models" / "sweeps" / "f_extras_1x_100_t2.pt.best",
+    REPO_ROOT / "models" / "sweeps" / "h_mod_nosched_mrr.pt.best",
+    REPO_ROOT / "models" / "sweeps" / "g_drop15_nosched_t2.pt.best",
     REPO_ROOT / "models" / "ngram_baseline.pkl",
-    REPO_ROOT / "models" / "transformer_smoke.pt",
 ]
 SPLITS_DIR = REPO_ROOT / "data" / "processed" / "splits"
 
@@ -171,15 +170,16 @@ def get_metrics_sections(payload: dict[str, Any]) -> tuple[dict, dict, dict, dic
 
 
 st.set_page_config(
-    page_title="Industrial: Process Unfolding Demo",
+    page_title="Track 1 — Process Logic Demo",
     layout="wide",
 )
 
-st.title("Industrial — Models that learn how processes unfold")
+st.title("Track 1 — Learning Process Logic")
 st.write(
-    "Real Infineon `training_data/` demo for **next-step prediction**, "
-    "**sequence completion**, and **rule-based anomaly detection**. Use the "
-    "sidebar to switch between the n-gram baseline and a trained small Transformer."
+    "Live demo for the three [Track 1](%s) submission tasks: **next-step prediction**, "
+    "**sequence completion** (60%%/80%% prefix on judge eval), and **rule-based anomaly detection**. "
+    "Compare n-gram baseline vs trained Transformer checkpoints."
+    % TRACK_DOC_URL
 )
 
 model_paths = available_model_paths()
@@ -304,12 +304,21 @@ with ctrl[1]:
     )
 with ctrl[2]:
     full = sequences[family][sid] if sid else []
-    prefix_pct = st.slider(
-        "Prefix length (% of full sequence)",
-        min_value=10,
-        max_value=95,
-        value=50,
+    prefix_mode = st.radio(
+        "Prefix (Track 1 judge uses 60% / 80%)",
+        ["60%", "80%", "Custom"],
+        horizontal=True,
+        index=0,
     )
+    if prefix_mode == "Custom":
+        prefix_pct = st.slider(
+            "Custom prefix %",
+            min_value=10,
+            max_value=95,
+            value=50,
+        )
+    else:
+        prefix_pct = int(prefix_mode.replace("%", ""))
     prefix_len = max(1, int(len(full) * prefix_pct / 100)) if full else 0
 
 if not full:
@@ -332,6 +341,7 @@ rank = next((i + 1 for i, tok in enumerate(topk) if tok == gold_next), None)
 t1_df = pd.DataFrame({
     "rank": list(range(1, len(topk) + 1)),
     "predicted_next_step": topk,
+    "description": [describe_step(family, t)["description"] or "—" for t in topk],
     "is_gold": [tok == gold_next for tok in topk],
 })
 left, right = st.columns([2, 1])
@@ -369,7 +379,9 @@ diff_rows = []
 for i in range(max_len):
     p = pred_continuation[i] if i < len(pred_continuation) else ""
     g = gold_continuation[i] if i < len(gold_continuation) else ""
-    diff_rows.append({"i": i, "predicted": p, "gold": g, "match": p == g and p != ""})
+    desc = describe_step(family, g or p)["description"] if (g or p) else ""
+    diff_rows.append({"i": i, "predicted": p, "gold": g, "match": p == g and p != "",
+                      "step_description": desc[:80] + ("…" if len(desc) > 80 else "") if desc else "—"})
 with st.expander("Token-by-token diff", expanded=False):
     st.dataframe(pd.DataFrame(diff_rows), width="stretch", hide_index=True)
 with st.expander("Full predicted sequence", expanded=False):
