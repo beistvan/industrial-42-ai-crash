@@ -65,6 +65,8 @@ python scripts/sweep_transformer.py \
 |---|---|---:|---|
 | `f_drop15_100_mrr` | `leonardo_final.yaml` | 2 | Wave 1 T1 leader (superseded by `h_mod_nosched_mrr`) |
 | `h_mod_nosched_t2` | `leonardo_lite.yaml` | 0 | Modern stack + T2 prefix training (experimental) |
-| `h_mod_nosched_s7_mrr` | `leonardo_lite.yaml` | 1 | T1 recipe, seed 7 |
+| `h_mod_nosched_s7_mrr` | `leonardo_lite.yaml` | 1 | T1 recipe, seed 7 — dev MRR **0.867** (below `h_mod_nosched_mrr` 0.874) |
+| `q_mod_large_nosched_mrr` | `leonardo_quick_arch.yaml` | 0 | Modern large (d384×8L), 60 ep — capacity probe, not submission pick |
+| `q_mod_large_nosched_t2` | `leonardo_quick_arch.yaml` | 1 | Same stack + T2 prefix training (60 ep) |
 
-Full sweep history: `leonardo_v1.yaml`, `leonardo_final.yaml`, `leonardo_fine.yaml`, `leonardo_modern.yaml`, `leonardo_task2.yaml`, `leonardo_params.yaml`, `leonardo_scale.yaml`, `leonardo_lite.yaml`, `leonardo_modern_tune.yaml`.
+Full sweep history: `leonardo_v1.yaml`, `leonardo_final.yaml`, `leonardo_fine.yaml`, `leonardo_modern.yaml`, `leonardo_task2.yaml`, `leonardo_params.yaml`, `leonardo_scale.yaml`, `leonardo_lite.yaml`, `leonardo_modern_tune.yaml`, `leonardo_quick_arch.yaml`.

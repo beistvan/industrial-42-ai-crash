@@ -1,0 +1,35 @@
+# Quick architecture probe — modern-large + nosched winner recipes.
+#
+# Goal: test Wave 6 capacity stretch WITHOUT param enrichment or full 100ep.
+# ETA ~60–90 min/GPU once scheduled (60 ep, batch 128).
+#
+# Submit: make leonardo-wave-quick-arch
+
+defaults:
+  base_config: configs/transformer_modern_large.yaml
+  arch: modern
+  extra_data_dir: data/generated/infineon
+  batch_size: 128
+  amp: true
+  label_smoothing: 0.1
+  scheduler: none
+  warmup_steps: 0
+  epochs: 60
+  dropout: 0.15
+
+finalists:
+  - run_name: q_mod_large_nosched_mrr
+    save_best_by: dev_mrr
+    eval_task1_every: 1
+    eval_task2_every: 5
+    note: modern d384×8L + T1 nosched recipe (60 ep smoke)
+
+  - run_name: q_mod_large_nosched_t2
+    save_best_by: dev_token_acc
+    eval_task1_every: 5
+    eval_task2_every: 5
+    eval_beam_width: 4
+    eval_candidate_pool: 5
+    completion_prefix_min: 0.6
+    completion_prefix_max: 0.8
+    note: same stack + T2 prefix training (60 ep)
