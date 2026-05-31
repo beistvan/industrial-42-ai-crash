@@ -65,7 +65,7 @@ SUM_JOB=$(sbatch --parsable --account="$ACCOUNT" \
             echo '    --model models/sweeps/<run_name>.pt.best \\'; \
             echo '    --eval-valid <organizer_valid.csv> \\'; \
             echo '    --eval-anomaly <organizer_anomaly.csv> \\'; \
-            echo '    --out-dir extras/results_submission \\'; \
+            echo '    --out-dir result/submission \\'; \
             echo '    --rule-constrained --candidate-pool 5'; \
             echo '===================================================='")
 echo "  leaderboard job: $SUM_JOB (waits for $SWEEP_JOB)"

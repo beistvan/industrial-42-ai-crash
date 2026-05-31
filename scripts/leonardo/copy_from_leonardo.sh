@@ -5,7 +5,7 @@
 #   bash scripts/leonardo/copy_from_leonardo.sh
 #   bash scripts/leonardo/copy_from_leonardo.sh models artifacts/sweeps logs
 #
-# Default: pulls models/, artifacts/, logs/, extras/results*
+# Default: pulls models/, artifacts/, logs/, result/submission*
 
 set -euo pipefail
 
@@ -20,7 +20,7 @@ REMOTE_PATH="${REMOTE_SCRATCH}/industrial"
 if [[ $# -gt 0 ]]; then
     PATHS=("$@")
 else
-    PATHS=(models artifacts logs extras)
+    PATHS=(models artifacts logs result)
 fi
 
 echo "=== Pull from Leonardo ==="

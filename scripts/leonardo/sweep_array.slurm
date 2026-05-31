@@ -14,7 +14,7 @@
 
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=EUHPC_D30_031
-#SBATCH --reservation=s_tra_ncc
+# Reservation is optional — pass at submit time: SLURM_RESERVATION=s_tra_ncc
 #SBATCH --job-name=zoh-sweep
 #SBATCH --nodes=1
 #SBATCH --ntasks=1

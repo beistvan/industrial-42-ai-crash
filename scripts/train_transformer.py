@@ -42,14 +42,16 @@ from src.data import (  # noqa: E402
     load_extra_families,
     merge_sequence_maps,
 )
+from src.data.param_enrichment import ParamEnrichment, enrich_sequences  # noqa: E402
 from src.eval.run_eval import (  # noqa: E402
     evaluate_all,
     evaluate_anomaly,
     evaluate_completion,
     evaluate_next_step,
 )
+from src.ml.modern_transformer import build_process_net  # noqa: E402
 from src.ml.transformer_model import (  # noqa: E402
-    ProcessTransformerNet,
+    CompletionAwareTrainingDataset,
     SequenceTrainingDataset,
     TransformerConfig,
     TransformerProcessModel,
@@ -269,6 +271,10 @@ def _resolve_args_config(args) -> tuple[TransformerConfig, dict[str, Any]]:
         defaults["warmup_steps"] = args.warmup_steps
     if getattr(args, "amp", None) is not None:
         defaults["amp"] = args.amp
+    arch = str(model_cfg.get("arch", getattr(args, "arch", "vanilla") or "vanilla"))
+    if getattr(args, "arch", None):
+        arch = args.arch
+    defaults["arch"] = arch
     return config, defaults
 
 
@@ -329,6 +335,19 @@ def main() -> None:
     parser.add_argument("--eval-no-rule-constrained", dest="eval_rule_constrained",
                         action="store_false")
     parser.add_argument("--eval-candidate-pool", dest="eval_candidate_pool", type=int, default=5)
+    parser.add_argument("--eval-beam-width", dest="eval_beam_width", type=int, default=1,
+                        help="Beam width for Task-2 dev eval (1 = greedy/rule-filter).")
+    parser.add_argument("--arch", choices=["vanilla", "modern"], default=None,
+                        help="Model stack: vanilla (2017) or modern (RoPE/RMSNorm/SwiGLU).")
+    parser.add_argument("--completion-prefix-min", dest="completion_prefix_min",
+                        type=float, default=None,
+                        help="Min fraction of steps kept as prefix for Task-2 training.")
+    parser.add_argument("--completion-prefix-max", dest="completion_prefix_max",
+                        type=float, default=None,
+                        help="Max fraction of steps kept as prefix for Task-2 training.")
+    parser.add_argument("--param-enrichment", dest="param_enrichment",
+                        choices=["none", "after_step"], default=None,
+                        help="Wave 5: insert fab-parameter aux tokens after each STEP during training.")
     args = parser.parse_args()
 
     require_torch()
@@ -363,10 +382,32 @@ def main() -> None:
     if args.extra_data_dir:
         print("      extras: " + ", ".join(f"{f}={extra_counts[f]}" for f in FAMILIES))
 
+    param_mode: ParamEnrichment = str(train_cfg.get("param_enrichment", "none"))  # type: ignore[assignment]
+    if args.param_enrichment is not None:
+        param_mode = args.param_enrichment  # type: ignore[assignment]
+    if param_mode not in ("none", "after_step"):
+        raise SystemExit(f"Unsupported param_enrichment: {param_mode!r}")
+
     print("[2/5] Building vocabulary and tokenized datasets")
     vocab_source = {fam: {**train.get(fam, {}), **dev.get(fam, {})} for fam in FAMILIES}
+    if param_mode != "none":
+        vocab_source = enrich_sequences(vocab_source, mode=param_mode)
+        train = enrich_sequences(train, mode=param_mode)
+        dev = enrich_sequences(dev, mode=param_mode)
+        print(f"      param_enrichment={param_mode} (judge outputs remain STEP-only)")
     vocab = Vocabulary.from_sequences(vocab_source)
-    train_ds = SequenceTrainingDataset(train, vocab, max_len=config.max_len)
+    arch = str(train_cfg.get("arch", "vanilla"))
+    model_type = "modern_decoder_only" if arch == "modern" else "transformer_decoder_only"
+    prefix_min = args.completion_prefix_min
+    prefix_max = args.completion_prefix_max
+    if prefix_min is not None and prefix_max is not None:
+        train_ds: SequenceTrainingDataset | CompletionAwareTrainingDataset = CompletionAwareTrainingDataset(
+            train, vocab, max_len=config.max_len,
+            prefix_frac_min=prefix_min, prefix_frac_max=prefix_max, seed=args.seed,
+        )
+        print(f"      completion training: prefix_frac=[{prefix_min}, {prefix_max}]")
+    else:
+        train_ds = SequenceTrainingDataset(train, vocab, max_len=config.max_len)
     dev_ds = SequenceTrainingDataset(dev, vocab, max_len=config.max_len) if any(dev.values()) else None
     collate = partial(collate_lm_batch, pad_id=vocab.pad_id)
     train_loader = DataLoader(
@@ -386,10 +427,10 @@ def main() -> None:
             collate_fn=collate,
         )
     print(f"      vocab_size={len(vocab)}, train_examples={len(train_ds)}")
-    print(f"      config={asdict(config)}")
+    print(f"      config={asdict(config)}, arch={arch}")
 
     print(f"[3/5] Training on {device}")
-    net = ProcessTransformerNet(len(vocab), config, vocab.pad_id).to(device)
+    net = build_process_net(arch, len(vocab), config, vocab.pad_id).to(device)
     optimizer = _make_optimizer(
         net,
         lr=float(train_cfg["lr"]),
@@ -439,7 +480,9 @@ def main() -> None:
             dev_loss = _eval_lm_loss(net, dev_loader, device=device, pad_id=vocab.pad_id)
 
         # Cheap Task-1 eval (single forward per dev item).
-        wrapper = TransformerProcessModel(net, vocab, config, device=str(device))
+        wrapper = TransformerProcessModel(
+            net, vocab, config, device=str(device), model_type=model_type,
+        )
         task1_metrics = None
         if args.eval_task1_every > 0 and (epoch % args.eval_task1_every == 0) \
                 and eval_valid_csv.exists() and eval_valid_gold.exists():
@@ -460,6 +503,7 @@ def main() -> None:
                 wrapper, eval_valid_csv, eval_valid_gold,
                 rule_constrained=args.eval_rule_constrained,
                 candidate_pool=args.eval_candidate_pool,
+                beam_width=args.eval_beam_width,
             )
             last_task2 = task2_metrics
             print(f"      task2 eval ({time.time()-ev_t:.1f}s): "
@@ -514,6 +558,7 @@ def main() -> None:
         "seed": args.seed,
         "config_path": str(args.config),
         "train_cfg": train_cfg,
+        "param_enrichment": param_mode,
         "train_counts": {f: len(s) for f, s in train.items()},
         "dev_counts": {f: len(s) for f, s in dev.items()},
         "extra_data_dir": str(args.extra_data_dir) if args.extra_data_dir else None,
@@ -527,7 +572,9 @@ def main() -> None:
             "path": str(best_path) if best_epoch is not None else None,
         },
     }
-    wrapper = TransformerProcessModel(net, vocab, config, device=str(device), metadata=metadata)
+    wrapper = TransformerProcessModel(
+        net, vocab, config, device=str(device), metadata=metadata, model_type=model_type,
+    )
     wrapper.save(args.model_path, metadata=metadata)
 
     payload: dict[str, Any] = {
@@ -554,6 +601,7 @@ def main() -> None:
             wrapper, args.eval_dir,
             rule_constrained=args.eval_rule_constrained,
             candidate_pool=args.eval_candidate_pool,
+            beam_width=args.eval_beam_width,
         )
         eval_seconds = time.time() - t1
         payload["eval_seconds"] = round(eval_seconds, 2)

@@ -1,4 +1,5 @@
-PYTHON ?= python3
+PYTHON ?= $(shell if [ -x .venv/bin/python3 ]; then echo .venv/bin/python3; else echo python3; fi)
+STREAMLIT_PORT ?= 8501
 
 setup:
 	$(PYTHON) -m pip install -r requirements.txt
@@ -31,10 +32,13 @@ lint:
 	$(PYTHON) -m ruff check src tests scripts || true
 
 run-demo: check-app
-	$(PYTHON) -m streamlit run src/app/main.py
+	$(PYTHON) -m streamlit run src/app/main.py --server.port $(STREAMLIT_PORT)
 
 run-dashboard: check-app
-	$(PYTHON) -m streamlit run src/app/eval_dashboard.py
+	$(PYTHON) -m streamlit run src/app/eval_dashboard.py --server.port $(STREAMLIT_PORT)
+
+run-sweep-dashboard: check-app
+	$(PYTHON) -m streamlit run src/app/sweep_dashboard.py --server.port $(STREAMLIT_PORT)
 
 # Full local sanity path: real dev split, n-gram baseline, full tests, smoke report.
 # Transformer tests no longer skip: without PyTorch they fail with an install hint.
@@ -59,7 +63,7 @@ predict-dev:
 		--model models/ngram_baseline.pkl \
 		--eval-valid data/processed/dev_eval/eval_input_valid_dev.csv \
 		--eval-anomaly data/processed/dev_eval/eval_input_anomaly_dev.csv \
-		--out-dir extras/results_dev
+		--out-dir result/dev
 
 # Step 5: compact decoder-only Transformer. Smoke target is CPU-safe but requires torch.
 train-transformer-smoke: check-torch
@@ -75,7 +79,7 @@ local-eval-transformer: check-torch
 	$(PYTHON) src/eval/local_eval.py --model models/transformer_small.pt --out artifacts/transformer_local_eval_metrics.json
 
 TRANSFORMER_MODEL ?= models/sweeps/f_drop15_100_mrr.pt.best
-TRANSFORMER_OUT   ?= extras/results_dev
+TRANSFORMER_OUT   ?= result/dev
 predict-dev-transformer: check-torch
 	$(PYTHON) scripts/predict_submission.py \
 		--model $(TRANSFORMER_MODEL) \
@@ -88,6 +92,8 @@ generate-extra-local:
 	$(PYTHON) scripts/generate_extra_sequences.py --count-per-family 250 --seed 101 --force
 
 # Leonardo / Slurm convenience targets. Run these on Leonardo after login, git clone, and env setup.
+# Tune parallel GPU usage: export SWEEP_CONCURRENCY=32  (default 32 array tasks at once)
+# Optional reservation:     export SLURM_RESERVATION=s_tra_ncc
 leonardo-setup:
 	bash scripts/leonardo/setup_env.sh
 
@@ -112,22 +118,51 @@ leonardo-pack:
 leonardo-generate-extra-10k:
 	sbatch scripts/leonardo/00_generate_extra_10k.slurm
 
-# 12h-plan Wave 1: 6 parallel 100/150-epoch finalists. Concurrency 12.
-# Run on Leonardo after `bash scripts/leonardo/copy_to_leonardo.sh` from your laptop.
+# Generic sweep submit (SWEEP_CONCURRENCY default 32)
 leonardo-wave1:
-	@SLURM_ACCOUNT=$${SLURM_ACCOUNT:-EUHPC_D30_031}; \
-	N=$$(python3 scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_final.yaml --stage finalists --dry-run | grep -c '^\['); \
-	echo "Submitting Wave 1: $$N finalists, concurrency 12, account=$$SLURM_ACCOUNT"; \
-	sbatch --account=$$SLURM_ACCOUNT --array=0-$$((N-1))%12 \
-	    scripts/leonardo/sweep_array.slurm configs/sweeps/leonardo_final.yaml finalists
+	bash scripts/leonardo/submit_sweep.sh configs/sweeps/leonardo_final.yaml finalists
 
-# 12h-plan Wave 2: fine grid around Wave 1 winners. EDIT leonardo_fine.yaml first.
 leonardo-wave2:
-	@SLURM_ACCOUNT=$${SLURM_ACCOUNT:-EUHPC_D30_031}; \
-	N=$$(python3 scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_fine.yaml --stage finalists --dry-run | grep -c '^\['); \
-	echo "Submitting Wave 2: $$N rows, concurrency 12, account=$$SLURM_ACCOUNT"; \
-	sbatch --account=$$SLURM_ACCOUNT --array=0-$$((N-1))%12 \
-	    scripts/leonardo/sweep_array.slurm configs/sweeps/leonardo_fine.yaml finalists
+	bash scripts/leonardo/submit_sweep.sh configs/sweeps/leonardo_fine.yaml finalists
+
+leonardo-wave3:
+	bash scripts/leonardo/submit_sweep.sh configs/sweeps/leonardo_modern.yaml finalists
+
+leonardo-wave3-tune:
+	bash scripts/leonardo/submit_sweep.sh configs/sweeps/leonardo_modern_tune.yaml finalists
+
+leonardo-wave4:
+	bash scripts/leonardo/submit_sweep.sh configs/sweeps/leonardo_task2.yaml finalists
+
+leonardo-wave5:
+	bash scripts/leonardo/submit_sweep.sh configs/sweeps/leonardo_params.yaml finalists
+
+leonardo-wave6:
+	bash scripts/leonardo/submit_sweep.sh configs/sweeps/leonardo_scale.yaml finalists
+
+leonardo-wave-lite:
+	bash scripts/leonardo/submit_sweep.sh configs/sweeps/leonardo_lite.yaml finalists
+
+leonardo-wave5-if-needed:
+	bash scripts/leonardo/wave5_if_needed.sh
+
+# Submit Waves 3+4+6 in parallel (~24 jobs), start auto-leaderboard watcher
+leonardo-queue-parallel:
+	bash scripts/leonardo/queue_parallel_waves.sh
+
+leonardo-queue-all:
+	bash scripts/leonardo/queue_parallel_waves.sh --with-wave5
+
+# Background: rebuild LEADERBOARD_FINAL when metrics JSONs change; finalize when idle
+leonardo-watch-pipeline:
+	nohup bash scripts/leonardo/pipeline_watch.sh >> logs/pipeline-watch.out 2>&1 & \
+	echo "pipeline_watch started — tail -f logs/pipeline_watch.log"
+
+# Chain Wave 2 → 3 → 4 after Wave 2 is already submitted.
+leonardo-wave-pipeline:
+	@test -n "$$WAVE2_JOB" || (echo "Set WAVE2_JOB to the Wave 2 array id (e.g. 43145135)" && exit 1); \
+	nohup bash scripts/leonardo/wave_orchestrator.sh $$WAVE2_JOB >> logs/wave_orchestrator-nohup.out 2>&1 & \
+	echo "Pipeline watcher started (Wave2=$$WAVE2_JOB). tail -f logs/wave_orchestrator.log"
 
 # Rebuild final leaderboard (after Wave 1 or Wave 2 completes)
 leonardo-leaderboard-final:
@@ -136,6 +171,19 @@ leonardo-leaderboard-final:
 	    --out artifacts/sweeps/LEADERBOARD_FINAL.md \
 	    --csv artifacts/sweeps/LEADERBOARD_FINAL.csv
 	@echo "Wrote artifacts/sweeps/LEADERBOARD_FINAL.{md,csv}"
+
+# One-shot pipeline snapshot (login node)
+leonardo-status:
+	bash scripts/leonardo/status_now.sh
+
+# Pick best T1/T2 from LEADERBOARD_FINAL.csv and write result/submission/*.csv
+# Auto-uses Slurm when CUDA is unavailable (login node). Force local: FORCE_LOCAL=1
+regenerate-submission:
+	USE_SLURM=1 bash scripts/regenerate_submission.sh
+
+# Pitch deck PDF for Tally (styled PPTX if LibreOffice; else Marp from SLIDES.md)
+slides-pdf:
+	bash scripts/export_slides.sh
 
 # Generate +500/family synthetic data for Wave 1's f_extras_500_100_mrr row
 leonardo-generate-extras-500:

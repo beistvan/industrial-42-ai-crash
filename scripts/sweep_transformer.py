@@ -60,6 +60,11 @@ KNOB_TO_FLAG = {
     "dim_feedforward": "--dim-feedforward",
     "seed": "--seed",
     "device": "--device",
+    "arch": "--arch",
+    "completion_prefix_min": "--completion-prefix-min",
+    "completion_prefix_max": "--completion-prefix-max",
+    "eval_beam_width": "--eval-beam-width",
+    "param_enrichment": "--param-enrichment",
 }
 
 

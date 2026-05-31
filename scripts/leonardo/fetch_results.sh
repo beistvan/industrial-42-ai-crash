@@ -6,6 +6,6 @@ DEST="${2:-leonardo_results}"
 mkdir -p "$DEST"
 scp -r "$REMOTE/models" "$DEST/" || true
 scp -r "$REMOTE/artifacts" "$DEST/" || true
-scp -r "$REMOTE/extras/results_submission" "$DEST/" || true
+scp -r "$REMOTE/result/submission" "$DEST/" || true
 scp -r "$REMOTE/logs" "$DEST/" || true
 echo "fetched to $DEST"

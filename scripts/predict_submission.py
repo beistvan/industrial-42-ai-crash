@@ -6,7 +6,7 @@ Usage:
         --model models/sweeps/m_real_extras_1x.pt.best \\
         --eval-valid EVAL_DATA/eval_input_valid.csv \\
         --eval-anomaly EVAL_DATA/eval_input_anomaly.csv \\
-        --out-dir extras/results_submission \\
+        --out-dir result/submission \\
         --rule-constrained --beam-width 5 --candidate-pool 5
 
 Auto-detects input format:
@@ -26,6 +26,8 @@ Judge output formats (per EVAL_DATA/eval_metrics.py):
     completion: EXAMPLE_ID,PREDICTED_SEQUENCE          (pipe-separated)
     anomaly:    EXAMPLE_ID,IS_VALID,SCORE,PREDICTED_RULE
                 SCORE in [0,1], higher = more likely valid (feeds AUC).
+                IS_VALID / PREDICTED_RULE from official rule validator;
+                SCORE from Task-1 LM teacher-forced log-prob (when --model given).
 """
 from __future__ import annotations
 
@@ -40,6 +42,11 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.data.infineon_loader import Family, FAMILIES  # noqa: E402
+from src.eval.anomaly_scoring import (  # noqa: E402
+    compose_anomaly_score,
+    log_prob_to_validity_score,
+    sequence_log_prob,
+)
 from src.eval.rule_validator import classify_sequence  # noqa: E402
 from src.ml import load_sequence_model  # noqa: E402
 
@@ -134,10 +141,23 @@ def _read_eval_csv(path: Path) -> tuple[dict[str, tuple[Family, list[str]]], str
     return mapping, LEGACY_FORMAT, ordered
 
 
-def _anomaly_score(rules: list[str]) -> float:
-    """Heuristic P(valid) in [0, 1]. Replace with LM likelihood for true AUC."""
-    n = min(len(rules), _MAX_RULES_FOR_SCORING)
-    return 1.0 - n / _MAX_RULES_FOR_SCORING
+def _anomaly_score(
+    rules: list[str],
+    *,
+    valid: bool,
+    family: Family,
+    steps: list[str],
+    model=None,
+) -> float:
+    """P(valid) in [0, 1] for judge SCORE / AUC."""
+    if model is None:
+        n = min(len(rules), _MAX_RULES_FOR_SCORING)
+        return 1.0 - n / _MAX_RULES_FOR_SCORING
+    lm_score = log_prob_to_validity_score(
+        sequence_log_prob(model, family, steps),
+        len(steps),
+    )
+    return compose_anomaly_score(valid=valid, rules=rules, lm_score=lm_score)
 
 
 def write_nextstep(model, inputs: dict, ordered_ids: list[str], out_path: Path,
@@ -210,25 +230,32 @@ def write_completion(model, inputs: dict, ordered_ids: list[str], out_path: Path
                     w.writerow([sid, idx, step])
 
 
-def write_anomaly(inputs: dict, ordered_ids: list[str], out_path: Path, fmt: str) -> None:
+def write_anomaly(
+    inputs: dict,
+    ordered_ids: list[str],
+    out_path: Path,
+    fmt: str,
+    *,
+    model=None,
+) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         if fmt == JUDGE_FORMAT:
             w.writerow(["EXAMPLE_ID", "IS_VALID", "SCORE", "PREDICTED_RULE"])
             for sid in ordered_ids:
-                _fam, steps = inputs[sid]
+                family, steps = inputs[sid]
                 res = classify_sequence(steps)
                 w.writerow([
                     sid,
                     int(res["valid"]),
-                    f"{_anomaly_score(res['rules']):.4f}",
+                    f"{_anomaly_score(res['rules'], valid=res['valid'], family=family, steps=steps, model=model):.4f}",
                     res["primary_rule"] or "",
                 ])
         else:
             w.writerow(["SEQUENCE_ID", "IS_VALID", "PRIMARY_RULE", "ALL_RULES"])
             for sid in ordered_ids:
-                _fam, steps = inputs[sid]
+                family, steps = inputs[sid]
                 res = classify_sequence(steps)
                 w.writerow([
                     sid,
@@ -245,7 +272,7 @@ def main() -> None:
                     help="Tasks 1+2 input CSV (partial sequences).")
     ap.add_argument("--eval-anomaly", type=Path,
                     help="Task 3 input CSV (full sequences).")
-    ap.add_argument("--out-dir", type=Path, default=REPO_ROOT / "extras" / "results")
+    ap.add_argument("--out-dir", type=Path, default=REPO_ROOT / "result" / "submission")
     ap.add_argument("--device", default=None,
                     help="Device for Transformer checkpoints, e.g. cpu or cuda. Ignored for n-gram .pkl models.")
     ap.add_argument("--rule-constrained", dest="rule_constrained",
@@ -279,7 +306,7 @@ def main() -> None:
     if args.eval_anomaly:
         anomaly_inputs, fmt, ordered = _read_eval_csv(args.eval_anomaly)
         print(f"[predict] {args.eval_anomaly.name}: format={fmt}, {len(ordered)} examples")
-        write_anomaly(anomaly_inputs, ordered, args.out_dir / "anomaly.csv", fmt)
+        write_anomaly(anomaly_inputs, ordered, args.out_dir / "anomaly.csv", fmt, model=model)
         print(f"[predict] wrote {args.out_dir/'anomaly.csv'}")
 
     if not args.eval_valid and not args.eval_anomaly:
