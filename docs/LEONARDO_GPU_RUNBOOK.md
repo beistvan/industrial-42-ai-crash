@@ -7,8 +7,7 @@ demo and jury-facing outputs:
 
 ```bash
 make smoke          # dev split + n-gram + tests
-make run-demo       # Streamlit demo (loads submission checkpoints if present)
-make run-dashboard  # sweep leaderboard dashboard
+make run-dashboard  # unified Track 1 UI (metrics, leaderboard, training curves, live demo)
 ```
 
 Reproduce or refresh submission CSVs on GPU — see [`HANDOFF.md`](../HANDOFF.md)
@@ -190,7 +189,7 @@ make leonardo-watch-pipeline    # auto-rebuild LEADERBOARD_FINAL while jobs run
 
 # When queue drains:
 make leonardo-leaderboard-final && make regenerate-submission
-make run-sweep-dashboard
+make run-dashboard
 ```
 
 | Wave | YAML | Rows |

@@ -301,11 +301,11 @@ Mapped to the [Zero One Track 1](https://docs.zero-one.lumos-consulting.at/track
 | **MVP:** reproducible end-to-end workflow | ✅ | `Makefile`, `docs/PIPELINE.md`, pytest |
 | **MVP:** synthetic data generation | ✅ | `scripts/generate_extra_sequences.py` (+750 seq) |
 | **MVP:** at least one trained model | ✅ | Transformer ~4M params + n-gram baseline |
-| **MVP:** baseline vs post-training comparison | ✅ | Dev metrics, `make run-demo`, sweep dashboard |
+| **MVP:** baseline vs post-training comparison | ✅ | Dev metrics, unified dashboard (`make run-dashboard`) |
 | **MVP:** documented benchmark | ✅ | `LEADERBOARD_FINAL`, `REPORT.md`, per-run JSONs |
 | **Stretch:** multiple architectures | 🔄 | Vanilla done; Wave 3 modern stack in flight |
 | **Stretch:** scaling effects | ✅ | Level 3 data scaling table (1× helps, 2×/500 hurts) |
-| **Stretch:** demonstrator (before/after) | ✅ | `make run-demo` — n-gram vs Transformer, 3 tasks |
+| **Stretch:** demonstrator (before/after) | ✅ | `make run-dashboard` — Live demo tab, n-gram vs Transformer, 3 tasks |
 | **Stretch:** optional process parameters | 🔄 Wave 5 | Training-only aux tokens; ADR 0004; run if Wave 3/4 plateau |
 | **Stretch:** OOD / modified sequences | ⏳ judge | Task 4 evaluated by organizers on hidden set |
 | **Stretch:** model size ladder | ⏳ | ~4M params only; larger config scaffolded, not run |
@@ -333,7 +333,7 @@ account `EUHPC_D30_031`.
 
 **Libraries**: PyTorch (training + inference), NumPy + pandas (data plumbing),
 scikit-learn (a few utilities), PyYAML (sweep configs), Streamlit
-(`src/app/sweep_dashboard.py` shareable leaderboard view), pytest + ruff
+(`src/app/dashboard.py` — metrics, leaderboard, training curves, live demo), pytest + ruff
 (tests + lint), Matplotlib + Plotly (figures).
 
 **External APIs**: none.

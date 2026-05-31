@@ -184,7 +184,7 @@ make leonardo-watch-pipeline         # auto-rebuild LEADERBOARD_FINAL every 5 mi
 # When idle:
 make leonardo-leaderboard-final
 make regenerate-submission
-make run-sweep-dashboard
+make run-dashboard
 ```
 
 After Wave 3/4: `make leonardo-wave5-if-needed` (auto-gate) or `make leonardo-wave5` (force).

@@ -170,7 +170,7 @@ python -m src.eval.local_eval \
   --out artifacts/local_eval_h_mod_nosched_mrr.json
 ```
 
-Demo (baseline vs trained): `make run-demo` · Sweep dashboard: `make run-sweep-dashboard`
+Unified dashboard (metrics, leaderboard, training curves, live demo): `make run-dashboard`
 
 ---
 
@@ -196,7 +196,7 @@ Uses LibreOffice to convert the PPTX when available; otherwise renders `SLIDES.m
 Show the **system running**, not slideware:
 
 1. **~15 s** — problem (wrong fab step → scrap)  
-2. **~60 s** — Streamlit demo: n-gram vs Transformer on same prefix (`make run-demo`)  
+2. **~60 s** — Streamlit dashboard: **Live demo** tab — n-gram vs Transformer on same prefix (`make run-dashboard`)  
 3. **~30 s** — one number (MRR 0.873 / tok 0.455 vs baseline)  
 4. **~15 s** — rule validator flagging an invalid sequence  
 

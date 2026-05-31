@@ -42,7 +42,7 @@ LEVELS = [
         "items": [
             "Wave 1 Transformer finalists (vanilla ~4M params)",
             "Wave 2 hyperparam fine grid + hybrid Task-1/T2 specialists",
-            "Dev leaderboard + Streamlit before/after demo",
+            "Dev leaderboard + unified Streamlit dashboard (make run-dashboard)",
         ],
         "metric": f"MRR {SUBMISSION['task1_mrr']:.3f} · tok {SUBMISSION['task2_token_acc']:.3f}",
     },

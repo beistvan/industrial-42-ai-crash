@@ -142,7 +142,7 @@ More augmentation diverged from real distribution.
 
 - **Repo (public, MIT):** github.com/beistvan/industrial-42-ai-crash · branch `wave1-submission`
 - **One-command quickstart**: `make dev-split && make train-ngram && pytest -q` (~5 min, CPU)
-- **Dashboards**: `make run-demo` (before/after) · `make run-sweep-dashboard` (23-run leaderboard)
+- **Dashboard**: `make run-dashboard` — overview, leaderboard, training curves, live demo (3 tasks)
 - **REPORT.md** + per-run JSONs + judge-format submission CSVs all checked in.
 
 > **Submission is shipped. The pipeline is reusable. Everything is honest about

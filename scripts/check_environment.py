@@ -41,7 +41,7 @@ def main() -> None:
     parser.add_argument("--require-torch", action="store_true",
                         help="Fail if PyTorch is missing. Required for step 5 Transformer targets.")
     parser.add_argument("--require-streamlit", action="store_true",
-                        help="Fail if Streamlit is missing. Required for run-demo/run-dashboard.")
+                        help="Fail if Streamlit is missing. Required for run-dashboard.")
     args = parser.parse_args()
 
     print(f"Python: {sys.version.split()[0]} ({platform.system()} {platform.machine()})")
