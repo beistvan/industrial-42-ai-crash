@@ -100,7 +100,11 @@ Five key technical decisions:
    (`src/eval/anomaly_scoring.py`); detection and rule ID come from the official
    rule validator with `pick_primary_rule` tie-break.
 
-### Hyperparameter sweep on Leonardo (CINECA EuroHPC A100)
+### Hyperparameter sweep (GPU training history)
+
+Training ran on CINECA Leonardo A100s during the hackathon; reproduction uses
+the same sweep YAMLs as plain CLI rows (`sweep_transformer.py --row N`) on any
+CUDA machine — no cluster scripts in this repo.
 
 | Wave | Rows | Epochs | Notes |
 |---|---|---|---|
@@ -117,53 +121,69 @@ Submitted hybrid uses Wave 3 Task-1 winner + Wave 2 Task-2 winner.
 ## How to run it
 
 ### Quickstart (CPU, ~5 min)
+
 ```bash
 git clone -b wave1-submission https://github.com/beistvan/industrial-42-ai-crash.git
 cd industrial-42-ai-crash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 pip install --index-url https://download.pytorch.org/whl/cpu torch
-make dev-split && make train-ngram && pytest -q
+make dev-split && make train-ngram && make smoke   # pytest + artifact validation
 ```
 
-### Full reproduction (GPU, ~90 min on one A100)
+### Full reproduction (GPU, ~2–3 h train + predict)
+
 ```bash
-# Synthetic augmentation (deterministic, seed=101)
+# Data (once)
+python scripts/make_dev_split.py --force
 python scripts/generate_extra_sequences.py --count-per-family 250 --seed 101 --force
 
-# Train Task 1 leader (Wave 3 modern, row 4)
-python scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_modern.yaml \
-    --stage finalists --row 4     # h_mod_nosched_mrr   (Task-1 winner)
-python scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_fine.yaml \
-    --stage finalists --row 4     # g_drop15_nosched_t2 (Task-2 winner, Wave 2)
+# Task 1 leader — Wave 3 modern, row 4
+python scripts/sweep_transformer.py \
+    --sweep configs/sweeps/leonardo_modern.yaml --stage finalists --row 4
 
-# Hybrid submission
+# Task 2 leader — Wave 2 fine grid, row 4
+python scripts/sweep_transformer.py \
+    --sweep configs/sweeps/leonardo_fine.yaml --stage finalists --row 4
+
+# Hybrid judge CSVs (requires CUDA)
+make leaderboard-final
+make regenerate-submission
+# → result/submission/{nextstep,completion,anomaly}.csv
+```
+
+Manual predict (equivalent to regen script):
+
+```bash
 python scripts/predict_submission.py \
     --model models/sweeps/h_mod_nosched_mrr.pt.best \
     --eval-valid EVAL_DATA/eval_input_valid.csv \
     --eval-anomaly EVAL_DATA/eval_input_anomaly.csv \
     --out-dir result/reproduce \
-    --rule-constrained --beam-width 5 --candidate-pool 5 --device cuda
+    --rule-constrained --beam-width 1 --candidate-pool 5 --device cuda
 
 python scripts/predict_submission.py \
     --model models/sweeps/g_drop15_nosched_t2.pt.best \
     --eval-valid EVAL_DATA/eval_input_valid.csv \
     --out-dir result/reproduce_t2 \
-    --rule-constrained --beam-width 5 --candidate-pool 5 --device cuda
+    --rule-constrained --beam-width 5 --candidate-pool 8 --device cuda
 
 cp result/reproduce_t2/completion.csv result/reproduce/completion.csv
-
-# Score against ground truth (using the judge's official script)
-python EVAL_DATA/eval_metrics.py --task next-step \
-    --ground-truth <YOUR_GT.csv> --predictions result/reproduce/nextstep.csv
 ```
 
-The hackathon submission CSVs are checked in under `result/submission/`.
+The hackathon submission CSVs are checked in under `result/submission/`
+(601 / 601 / 988 rows). Score locally with the organizer script when ground
+truth is available:
 
-**What you need**: Python 3.10+, ~2 GB disk, a CUDA-12.1 PyTorch build for the
-GPU path. **No API keys. No external services.** Leonardo access is **not**
-required to reproduce — the sweep YAMLs work with any Slurm cluster or as
-plain CLI rows via `--row N`.
+```bash
+python EVAL_DATA/eval_metrics.py --task next-step \
+    --ground-truth <YOUR_GT.csv> --predictions result/submission/nextstep.csv
+```
+
+**What you need**: Python 3.10+, ~2 GB disk, PyTorch with CUDA for Transformer
+training and `make regenerate-submission`. **No API keys. No external services.**
+See [`README.md`](README.md), [`HANDOFF.md`](HANDOFF.md), and
+[`docs/ENGINEERING_PRACTICES.md`](docs/ENGINEERING_PRACTICES.md).
 
 ---
 
@@ -328,7 +348,7 @@ Mapped to the [Zero One Track 1](https://docs.zero-one.lumos-consulting.at/track
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| **MVP:** reproducible end-to-end workflow | ✅ | `Makefile`, `docs/PIPELINE.md`, pytest |
+| **MVP:** reproducible end-to-end workflow | ✅ | `Makefile`, `docs/PIPELINE.md`, `make smoke` (58 pytest tests) |
 | **MVP:** synthetic data generation | ✅ | `scripts/generate_extra_sequences.py` (+750 seq) |
 | **MVP:** at least one trained model | ✅ | Transformer ~4M params + n-gram baseline |
 | **MVP:** baseline vs post-training comparison | ✅ | Dev metrics, unified dashboard (`make run-dashboard`) |
@@ -339,11 +359,12 @@ Mapped to the [Zero One Track 1](https://docs.zero-one.lumos-consulting.at/track
 | **Stretch:** optional process parameters | ⏭ skipped | Wave 5 not needed — Wave 3 beat T1 bar |
 | **Stretch:** OOD / modified sequences | ⏳ judge | Task 4 evaluated by organizers on hidden set |
 | **Stretch:** model size ladder | ⏳ | ~4M params only; larger config scaffolded, not run |
-| **Format:** training + eval report | ✅ | This report + GPU summary + leaderboard |
-| **Learning objectives** | ✅ | Leonardo training, synthetic data, benchmarking, scaling analysis |
+| **Format:** training + eval report | ✅ | This report + `LEADERBOARD_FINAL` + per-run JSONs |
+| **Learning objectives** | ✅ | GPU training, synthetic data, benchmarking, scaling analysis |
 
 Submission is **final** — hybrid `h_mod_nosched_mrr` + `g_drop15_nosched_t2`.
-Re-run `make regenerate-submission` only if a new sweep beats the current picks.
+Re-run `make leaderboard-final && make regenerate-submission` only if a new
+sweep beats the current picks.
 
 ---
 
@@ -367,8 +388,8 @@ Full workflow: [`docs/ENGINEERING_PRACTICES.md`](docs/ENGINEERING_PRACTICES.md).
 
 **People**: Andrija Jovanovic, Istvan Beregszaszi, Thánh Trung Nguyen.
 
-**Compute**: CINECA Leonardo (EuroHPC) GPU partition, reservation `s_tra_ncc`,
-account `EUHPC_D30_031`.
+**Compute**: CINECA Leonardo (EuroHPC) A100 GPUs during the hackathon; the public
+repo reproduces via Makefile + plain Python on any CUDA machine.
 
 **Code & data we used as-is**:
 - `data/raw/infineon/training_data/generate_sequences.py` — the official

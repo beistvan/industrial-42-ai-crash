@@ -7,25 +7,25 @@ generate predictions for three tasks: next-step, sequence completion, and
 anomaly detection against a 10-rule process grammar.
 
 - **License**: MIT (see `LICENSE`)
-- **Team**: Andrija Jovanovic, Istvan Beregszaszi, Thánh Trung Nguyen
+- **Team**: Andrija Jovanovic, Istvan Beregszaszi, Thanh Trung Nguyen
 - **Track**: Industrial AI (Infineon)
-- **Report**: see [`REPORT.md`](REPORT.md)
-- **Submission plan**: see [`docs/SUBMISSION.md`](docs/SUBMISSION.md)
+- **Report**: [`REPORT.md`](REPORT.md) · **Handoff**: [`HANDOFF.md`](HANDOFF.md)
+- **Submission plan**: [`docs/SUBMISSION.md`](docs/SUBMISSION.md)
 
 ## What's in this repo
 
 ```
 src/, scripts/, tests/, configs/      Code + tests + sweep YAMLs
-EVAL_DATA/                            Judge eval inputs + the official eval_metrics.py
-result/submission/            THE submission (3 judge-format CSVs)
+EVAL_DATA/                            Judge eval inputs + eval_metrics.py
+result/submission/                    Judge CSVs (nextstep, completion, anomaly)
 artifacts/sweeps/                     Per-run metrics + LEADERBOARD_FINAL
+models/sweeps/                        Submission checkpoints (2 × .pt.best)
 data/raw/infineon/                    Organizer-provided source data
-data/generated/infineon/              Synthetic augmentation (deterministic, manifest.json)
-docs/                                 ADRs, data spec, submission notes
-docs/ENGINEERING_PRACTICES.md         Pipeline workflow & engineering practices
-slides/                               Pitch deck (PPTX; see slides/README.md for PDF)
-REPORT.md, README.md, LICENSE         Required jury deliverables
-requirements.txt, Makefile            Reproducibility
+data/generated/infineon/              Synthetic augmentation (deterministic)
+docs/                                 ADRs, data spec, ENGINEERING_PRACTICES, SUBMISSION
+slides/                               Pitch deck (PPTX; see slides/README.md)
+Makefile                              dev-split, smoke, leaderboard, regen, dashboard
+REPORT.md, README.md, HANDOFF.md      Jury + teammate docs
 ```
 
 ## What we built (one-line each)
@@ -59,7 +59,9 @@ pip install --index-url https://download.pytorch.org/whl/cpu torch
 python scripts/check_environment.py --require-torch
 make dev-split           # builds data/processed/splits/ and dev_eval/
 make train-ngram         # baseline; ~2 minutes
-pytest -q                # ~47 tests, all should pass
+make smoke               # pytest + artifact validation (~1 min more)
+# or: pytest -q          # 58 tests
+make run-dashboard       # optional — metrics, leaderboard, eval matrix, live demo
 ```
 
 The repo includes everything **except model checkpoints** (they're ~140 MB and
@@ -69,11 +71,11 @@ submission** below.
 ## Reproducing the submission
 
 Full retraining of Wave 1 + Wave 2 picks takes ~2–3 hours on a single A100 GPU.
-Checkpoints already on disk? Regenerate judge CSVs in one step:
+Checkpoints already on disk? Regenerate judge CSVs:
 
 ```bash
-make leaderboard-final   # if metrics JSONs changed
-make regenerate-submission        # picks best T1/T2; GPU predict (requires CUDA)
+make leaderboard-final      # if metrics JSONs changed
+make regenerate-submission  # hybrid T1/T2 predict → result/submission/ (CUDA GPU)
 ```
 
 Task 3 (`anomaly.csv`) reuses the **Task-1 checkpoint** for the LM `SCORE` column;
@@ -96,20 +98,35 @@ python scripts/sweep_transformer.py \
     --sweep configs/sweeps/leonardo_fine.yaml --stage finalists --row 4
 # -> models/sweeps/g_drop15_nosched_t2.pt.best
 
-# 4. Hybrid predictions on judge inputs
-bash scripts/regenerate_submission.sh
+# 3. Hybrid predictions on judge inputs
+make regenerate-submission
+# or: bash scripts/regenerate_submission.sh
 ```
 
-Sweep rows expand to plain CLI via `scripts/sweep_transformer.py --row N` (see `configs/sweeps/WINNING_RECIPES.md`).
+Winning sweep rows: [`configs/sweeps/WINNING_RECIPES.md`](configs/sweeps/WINNING_RECIPES.md)  
+Pipeline checklist: [`docs/ENGINEERING_PRACTICES.md`](docs/ENGINEERING_PRACTICES.md)
+
+## Makefile shortcuts
+
+| Target | Purpose |
+|---|---|
+| `make dev-split` | Build persisted dev holdout |
+| `make train-ngram` | N-gram baseline + metrics JSON |
+| `make smoke` | dev-split + n-gram + pytest + artifact check |
+| `make validate-artifacts` | Schema checks on CSVs and metrics JSON |
+| `make rehearsal-train` | Tiny Transformer train+eval before long GPU runs |
+| `make eval-matrix` | 4-arm before/after comparison (dashboard tab) |
+| `make leaderboard-final` | Refresh `LEADERBOARD_FINAL.{csv,md}` |
+| `make regenerate-submission` | Pick T1/T2 + write judge CSVs (CUDA) |
+| `make dashboard` | Unified Streamlit UI |
 
 ## What you need to actually run this
 
 - **Python 3.10+**, ~2 GB disk
 - **No API keys, no external services** — everything runs locally
-- **PyTorch** (CPU is fine for inference + baseline; GPU/CUDA 12.1 recommended for training)
-- **A100 or equivalent** if you want to retrain in ≤2 hours; CPU works but slow (~12 h)
-- **GPU with CUDA** required for `make regenerate-submission` (Transformer predict on judge inputs)
-- Sweep YAMLs in `configs/sweeps/leonardo_*.yaml` run as plain CLI rows via `sweep_transformer.py --row N`
+- **PyTorch** — CPU for baseline/smoke; **CUDA GPU** for Transformer training and `make regenerate-submission`
+- **A100 or equivalent** if you want to retrain both submission models in ≤3 hours
+- Sweep YAMLs (`configs/sweeps/leonardo_*.yaml`) expand to CLI via `sweep_transformer.py --row N` — no cluster scripts required
 
 ## Honest limits
 
@@ -126,8 +143,8 @@ Everything in this repo can be freely reused, modified, and redistributed.
 
 ## Credits
 
-- **Organizers**: 42 AI Crash + Infineon for the track, the dataset, and the rule grammar.
+- **Organizers**: AI Factory Hackathon + Infineon for the track, the dataset, and the rule grammar.
 - **Pre-vendored code**: `data/raw/infineon/training_data/generate_sequences.py` (the official validator and synthetic sequence generator) is from the organizers and remains under their license.
 - **Libraries**: PyTorch, NumPy, pandas, scikit-learn, Streamlit, PyYAML, pytest, ruff.
-- **Compute**: CINECA Leonardo (EuroHPC) for GPU sweep, reservation `s_tra_ncc`, account `EUHPC_D30_031`.
-- **AI coding assistance**: GitHub Copilot, Claude (architecture sounding-board + boilerplate generation). All experimental decisions and the final architecture are ours.
+- **Compute**: CINECA Leonardo (EuroHPC) was used during the hackathon for GPU sweeps; reproduction is plain Python + Makefile on any CUDA machine.
+- **AI coding assistance**: Claude (architecture sounding-board + boilerplate generation). All experimental decisions and the final architecture are ours.

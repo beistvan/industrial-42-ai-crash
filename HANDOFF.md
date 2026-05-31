@@ -83,7 +83,7 @@ Architecture: **family-conditioned decoder-only Transformer** (from scratch, no 
 
 **Training data**: 3,000 real Infineon sequences (MOSFET/IGBT/IC) + 250 generated valid routes per family (`data/generated/infineon/`).
 
-**Decoding**: rule-constrained beam search for Task 2 (`--rule-constrained --beam-width 5 --candidate-pool 5`).
+**Decoding**: rule-constrained beam for Task 2 (regen defaults: `beam-width 5`, `candidate-pool 8`).
 
 **Task 3**: official Infineon rule validator (`classify_sequence`), not a neural anomaly head.
 
@@ -152,11 +152,19 @@ bash scripts/regenerate_submission.sh
 ### Score a checkpoint locally (dev only)
 
 ```bash
-python -m src.eval.local_eval \
+python src/eval/local_eval.py \
   --model models/sweeps/h_mod_nosched_mrr.pt.best \
   --device cuda \
   --out artifacts/local_eval_h_mod_nosched_mrr.json
 ```
+
+### Dashboard
+
+```bash
+make dashboard    # Overview, Eval matrix, Leaderboard, Training curves, Live demo
+```
+
+Static copy for the UI lives in `src/app/track_context.py` (`SUBMISSION`, `EVAL_ARMS`).
 
 ---
 
@@ -196,12 +204,16 @@ make eval-matrix                    # after checkpoints exist
 | File | Purpose |
 |---|---|
 | `REPORT.md` | Jury-facing write-up + Track 1 compliance |
+| `README.md` | Clone-and-run quickstart |
+| `scripts/README.md` | Script map + regen commands |
 | `artifacts/sweeps/LEADERBOARD_FINAL.csv` | All run numbers (27 rows) |
-| `result/submission/*.csv` | Official submission outputs |
-| `scripts/regenerate_submission.sh` | Re-pick T1/T2 from leaderboard + predict |
-| `EVAL_DATA/` | Organizer eval inputs |
-| `docs/ENGINEERING_PRACTICES.md` | Pipeline workflow (rehearsal, eval matrix, schema checks) |
-| `configs/sweeps/leonardo_fine.yaml` | Wave-2 fine grid (completed) |
-| `configs/sweeps/leonardo_modern.yaml` | Wave-3 modern architecture |
-| `configs/sweeps/leonardo_task2.yaml` | Wave-4 Task-2 prefix training |
+| `configs/sweeps/WINNING_RECIPES.md` | Submission T1/T2 sweep rows (row 4 each) |
+| `result/submission/*.csv` | Official submission outputs (601/601/988 rows) |
+| `scripts/regenerate_submission.sh` | Pick T1/T2 from leaderboard + GPU predict |
+| `Makefile` | `smoke`, `leaderboard-final`, `regenerate-submission`, `dashboard` |
+| `EVAL_DATA/` | Organizer eval inputs + `eval_metrics.py` |
+| `docs/ENGINEERING_PRACTICES.md` | Rehearsal, eval matrix, schema validation |
+| `docs/SUBMISSION.md` | Jury deliverables checklist |
+| `configs/sweeps/leonardo_modern.yaml` | Wave-3 T1 winner recipe |
+| `configs/sweeps/leonardo_fine.yaml` | Wave-2 T2 winner recipe |
 | `SLIDES.md` | 10-slide pitch (Marp-renderable) |
