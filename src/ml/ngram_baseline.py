@@ -93,6 +93,30 @@ class NGramBaseline:
         total = sum(counts.values()) or 1
         return [(tok, math.log(c / total)) for tok, c in counts.most_common(k)]
 
+    def step_log_prob(self, family: Family, prefix: list[str], token: str) -> float:
+        """Log-probability of a single next step (Task 3 SCORE)."""
+        if family not in FAMILIES:
+            raise ValueError(f"Unknown family {family!r}")
+        for order in range(min(self.max_order, len(prefix)), 0, -1):
+            suffix = tuple(prefix[-order:])
+            counts = self.suffix_counts[family].get(suffix)
+            if counts and token in counts:
+                total = sum(counts.values())
+                return math.log(counts[token] / total)
+        counts = self.unconditional[family]
+        if token not in counts:
+            return float("-inf")
+        total = sum(counts.values()) or 1
+        return math.log(counts[token] / total)
+
+    def sequence_log_prob(self, family: Family, steps: list[str]) -> float:
+        if len(steps) <= 1:
+            return 0.0
+        return sum(
+            self.step_log_prob(family, steps[:i], steps[i])
+            for i in range(1, len(steps))
+        )
+
     def complete(
         self,
         family: Family,

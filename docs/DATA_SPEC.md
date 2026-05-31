@@ -88,6 +88,19 @@ Organizers distribute these at kickoff. Drop them at:
 - `data/raw/infineon/eval/eval_input_anomaly.csv` — Task 3 (987 mixed valid /
   rule-violating sequences, unlabeled).
 
+This repo also mirrors judge inputs under `EVAL_DATA/`.
+
+### Reference metadata (descriptions / parameters)
+
+`reference/*_Longdescr.csv` and `*_longdescription_parameters.csv` map each
+canonical **STEP name** to text descriptions and fab-level parameters. They do
+**not** appear in the 3k training variant CSVs (which are STEP-only long format).
+
+Code: `src/data/step_metadata.py` joins STEP → description for demos/reports.
+**Training (Waves 1–4) and submission outputs use STEP tokens only** — matching
+the judge eval format. Using descriptions as a model input would be a separate
+stretch experiment (different vocab / multimodal stack).
+
 The scoring script `eval_metrics.py` is also organizer-provided and runs
 without external dependencies.
 

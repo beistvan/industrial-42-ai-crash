@@ -76,6 +76,9 @@ def test_transformer_forward_and_predict_api(toy_sequences):
     completed = wrapper.complete("mosfet", ["A"], max_steps=2)
     assert completed[:1] == ["A"]
 
+    lp = wrapper.sequence_log_prob("mosfet", ["A", "B", "SHIP LOT"])
+    assert lp <= 0.0
+
 
 @pytest.mark.unit
 def test_transformer_save_load_roundtrip(tmp_path, toy_sequences):

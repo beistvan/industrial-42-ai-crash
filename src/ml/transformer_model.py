@@ -28,6 +28,7 @@ from src.data.infineon_loader import (
     Sequences,
     Vocabulary,
 )
+from src.data.param_enrichment import is_param_token, prefix_end_for_steps
 
 try:  # Keep the repo importable in CPU-only/minimal environments.
     import torch
@@ -188,22 +189,96 @@ def _encode_sequence_examples(
     return examples
 
 
-def collate_lm_batch(examples: list[list[int]], pad_id: int) -> dict[str, Tensor]:
-    """Pad variable-length token streams for next-token prediction."""
+def collate_lm_batch(
+    examples: list[list[int]] | list[tuple[list[int], int]],
+    pad_id: int,
+) -> dict[str, Tensor]:
+    """Pad variable-length token streams for next-token prediction.
+
+    Examples may be plain token id lists or ``(ids, loss_start)`` tuples.
+    ``loss_start`` is the label index from which CE loss is computed (prefix
+    tokens are masked with ``pad_id``). Used for Task-2 completion training.
+    """
     require_torch()
     if not examples:
         raise ValueError("Cannot collate an empty batch")
-    max_len = max(len(ids) - 1 for ids in examples)
-    input_ids = torch.full((len(examples), max_len), pad_id, dtype=torch.long)
-    labels = torch.full((len(examples), max_len), pad_id, dtype=torch.long)
-    attention_mask = torch.zeros((len(examples), max_len), dtype=torch.long)
-    for row, ids in enumerate(examples):
+    parsed: list[tuple[list[int], int | None]] = []
+    for ex in examples:
+        if isinstance(ex, tuple):
+            parsed.append((ex[0], ex[1]))
+        else:
+            parsed.append((ex, None))
+    max_len = max(len(ids) - 1 for ids, _ in parsed)
+    input_ids = torch.full((len(parsed), max_len), pad_id, dtype=torch.long)
+    labels = torch.full((len(parsed), max_len), pad_id, dtype=torch.long)
+    attention_mask = torch.zeros((len(parsed), max_len), dtype=torch.long)
+    for row, (ids, loss_start) in enumerate(parsed):
         x = ids[:-1]
         y = ids[1:]
         input_ids[row, :len(x)] = torch.tensor(x, dtype=torch.long)
         labels[row, :len(y)] = torch.tensor(y, dtype=torch.long)
+        if loss_start is not None:
+            labels[row, :loss_start] = pad_id
         attention_mask[row, :len(x)] = 1
     return {"input_ids": input_ids, "labels": labels, "attention_mask": attention_mask}
+
+
+class CompletionAwareTrainingDataset(SequenceTrainingDataset):
+    """Random-prefix LM examples — loss only on the completion suffix."""
+
+    def __init__(
+        self,
+        sequences_per_family: dict[Family, Sequences],
+        vocab: Vocabulary,
+        *,
+        max_len: int = 180,
+        prefix_frac_min: float = 0.6,
+        prefix_frac_max: float = 0.8,
+        seed: int = 42,
+    ) -> None:
+        require_torch()
+        import random
+        self._rng = random.Random(seed)
+        self.prefix_frac_min = prefix_frac_min
+        self.prefix_frac_max = prefix_frac_max
+        self.vocab = vocab
+        self.max_len = max_len
+        self.examples: list[tuple[list[int], int]] = []
+        for family, sequences in sequences_per_family.items():
+            for steps in sequences.values():
+                for ids, loss_start in self._encode_completion_examples(
+                    family, steps, vocab, max_len,
+                ):
+                    self.examples.append((ids, loss_start))
+        if not self.examples:
+            raise ValueError("No training examples were produced")
+
+    def _encode_completion_examples(
+        self,
+        family: Family,
+        steps: list[str],
+        vocab: Vocabulary,
+        max_len: int,
+    ) -> list[tuple[list[int], int]]:
+        token_budget = max_len + 1
+        full_tokens = [BOS_TOKEN, FAMILY_TOKENS[family], *steps, EOS_TOKEN]
+        if len(full_tokens) > token_budget:
+            return [
+                (vocab.encode(full_tokens[:token_budget]), 2)
+            ]
+        n_steps = sum(1 for t in steps if not is_param_token(t))
+        if n_steps < 2:
+            ids = vocab.encode(full_tokens)
+            return [(ids, max(0, len(ids) - 2))]
+        lo = max(1, int(n_steps * self.prefix_frac_min))
+        hi = max(lo, int(n_steps * self.prefix_frac_max))
+        keep = self._rng.randint(lo, hi)
+        prefix_end = prefix_end_for_steps(steps, keep)
+        loss_start = max(0, 1 + prefix_end)
+        return [(vocab.encode(full_tokens), loss_start)]
+
+    def __getitem__(self, index: int) -> tuple[list[int], int]:
+        return self.examples[index]
 
 
 class TransformerProcessModel:
@@ -211,22 +286,32 @@ class TransformerProcessModel:
 
     def __init__(
         self,
-        net: ProcessTransformerNet,
+        net: nn.Module,
         vocab: Vocabulary,
         config: TransformerConfig,
         *,
         device: str | None = None,
         metadata: dict[str, Any] | None = None,
+        model_type: str = "transformer_decoder_only",
     ) -> None:
         require_torch()
         self.vocab = vocab
         self.config = config
+        self.model_type = model_type
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         self.net = net.to(self.device)
         self.net.eval()
         self.metadata = metadata or {}
         self._blocked_nextstep_ids = self._special_ids(include_eos=True)
         self._blocked_completion_ids = self._special_ids(include_eos=False)
+        self._blocked_param_ids = self._param_ids()
+
+    def _param_ids(self) -> set[int]:
+        return {
+            self.vocab.token_to_id[t]
+            for t in self.vocab.id_to_token
+            if is_param_token(t)
+        }
 
     def _special_ids(self, *, include_eos: bool) -> set[int]:
         blocked = set()
@@ -260,7 +345,7 @@ class TransformerProcessModel:
     ) -> list[int]:
         logits = self._next_logits(family, prefix)
         blocked = self._blocked_completion_ids if allow_eos else self._blocked_nextstep_ids
-        for token_id in blocked:
+        for token_id in blocked | self._blocked_param_ids:
             logits[token_id] = -torch.inf
         ranked = torch.argsort(logits, descending=True).tolist()
         out: list[int] = []
@@ -289,7 +374,7 @@ class TransformerProcessModel:
         """
         logits = self._next_logits(family, prefix)
         # Block specials except EOS — beam search wants to choose EOS to stop.
-        for token_id in self._blocked_completion_ids:
+        for token_id in self._blocked_completion_ids | self._blocked_param_ids:
             logits[token_id] = -torch.inf
         log_probs = torch.log_softmax(logits, dim=-1)
         ranked = torch.argsort(log_probs, descending=True).tolist()
@@ -302,6 +387,23 @@ class TransformerProcessModel:
             if len(out) >= k:
                 break
         return out
+
+    def step_log_prob(self, family: Family, prefix: list[str], token: str) -> float:
+        """Log-probability of a single next step (Task 3 SCORE)."""
+        if token not in self.vocab.token_to_id:
+            return float("-inf")
+        logits = self._next_logits(family, prefix)
+        log_probs = torch.log_softmax(logits, dim=-1)
+        return float(log_probs[self.vocab.token_to_id[token]].item())
+
+    def sequence_log_prob(self, family: Family, steps: list[str]) -> float:
+        """Teacher-forced log-probability of the full step sequence."""
+        if len(steps) <= 1:
+            return 0.0
+        return sum(
+            self.step_log_prob(family, steps[:i], steps[i])
+            for i in range(1, len(steps))
+        )
 
     def complete(
         self,
@@ -381,7 +483,7 @@ class TransformerProcessModel:
         """Persist model weights plus vocab/config metadata."""
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
-            "model_type": "transformer_decoder_only",
+            "model_type": getattr(self, "model_type", "transformer_decoder_only"),
             "config": asdict(self.config),
             "vocab_tokens": list(self.vocab.id_to_token),
             "state_dict": self.net.cpu().state_dict(),
@@ -398,9 +500,18 @@ class TransformerProcessModel:
         config = TransformerConfig.from_dict(payload["config"])
         tokens = tuple(payload["vocab_tokens"])
         vocab = Vocabulary(id_to_token=tokens, token_to_id={t: i for i, t in enumerate(tokens)})
-        net = ProcessTransformerNet(len(vocab), config, vocab.pad_id)
+        model_type = payload.get("model_type", "transformer_decoder_only")
+        if model_type == "modern_decoder_only":
+            from src.ml.modern_transformer import ModernProcessTransformerNet
+            net = ModernProcessTransformerNet(len(vocab), config, vocab.pad_id)
+        else:
+            net = ProcessTransformerNet(len(vocab), config, vocab.pad_id)
         net.load_state_dict(payload["state_dict"])
-        return cls(net, vocab, config, device=device, metadata=payload.get("metadata") or {})
+        return cls(
+            net, vocab, config, device=device,
+            metadata=payload.get("metadata") or {},
+            model_type=model_type,
+        )
 
     def stats(self) -> dict[str, Any]:
         return {
@@ -417,11 +528,16 @@ def build_transformer_model(
     *,
     device: str | None = None,
     metadata: dict[str, Any] | None = None,
+    arch: str = "vanilla",
 ) -> TransformerProcessModel:
     """Create an untrained TransformerProcessModel wrapper."""
     require_torch()
-    net = ProcessTransformerNet(len(vocab), config, vocab.pad_id)
-    return TransformerProcessModel(net, vocab, config, device=device, metadata=metadata)
+    from src.ml.modern_transformer import build_process_net
+    model_type = "modern_decoder_only" if arch == "modern" else "transformer_decoder_only"
+    net = build_process_net(arch, len(vocab), config, vocab.pad_id)
+    return TransformerProcessModel(
+        net, vocab, config, device=device, metadata=metadata, model_type=model_type,
+    )
 
 
 def iter_step_tokens(sequences_per_family: dict[Family, Sequences]) -> Iterable[str]:

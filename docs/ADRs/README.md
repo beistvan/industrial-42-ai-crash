@@ -11,6 +11,7 @@ GPT-2?").
 | 0001 | Why no HuggingFace pretrained model | accepted |
 | 0002 | Rule-constrained decoding default + opt-out | accepted |
 | 0003 | Beam search is opt-in, not default | accepted |
+| 0004 | Parameter-enrichment training (Wave 5 fallback) | accepted |
 
 When superseded, change the status line in the ADR header and link the
 replacement; do not delete.
