@@ -141,7 +141,7 @@ python scripts/sweep_transformer.py \
 python scripts/sweep_transformer.py \
   --sweep configs/sweeps/leonardo_fine.yaml --stage finalists --row 4
 
-# On Leonardo: make leonardo-wave1 && make leonardo-wave2
+# On Leonardo: bash scripts/leonardo/submit_sweep.sh configs/sweeps/leonardo_modern.yaml finalists --row 4
 make leonardo-leaderboard-final
 ```
 
@@ -192,7 +192,6 @@ See `docs/LEONARDO_GPU_RUNBOOK.md` for full Leonardo reproduction.
 | File | Purpose |
 |---|---|
 | `REPORT.md` | Jury-facing write-up + Track 1 compliance |
-| `RESULTS_GPU_SUMMARY.md` | GPU sweep summary by Level 1/2/3 |
 | `artifacts/sweeps/LEADERBOARD_FINAL.csv` | All run numbers (27 rows) |
 | `result/submission/*.csv` | Official submission outputs |
 | `scripts/regenerate_submission.sh` | Re-pick T1/T2 from leaderboard + predict |

@@ -1,8 +1,7 @@
-# Python
-__pycache__/
-eval/__pycache__/
-*/__pycache__/
-*.py[cod]
+# Python bytecode (all levels — must follow un-ignore rules below)
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
 .venv/
 venv/
 .env
@@ -37,6 +36,9 @@ venv/
 !/data/raw/infineon/
 !/data/raw/infineon/**
 
+# Re-ignore bytecode under vendor paths (negated above)
+data/raw/infineon/**/__pycache__/
+data/raw/infineon/**/*.pyc
 
 # OS / IDE
 .DS_Store

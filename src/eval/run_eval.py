@@ -1,20 +1,13 @@
-"""End-to-end local evaluation for a next-step model on the dev split.
-
-Currently wired for NGramBaseline; the same interface (predict_topk +
-complete) is what the transformer will implement, so swapping in a trained
-model later is a one-line change.
-"""
+"""End-to-end local evaluation for a next-step model on the dev split."""
 from __future__ import annotations
 
 import csv
-import math
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
 from src.data.infineon_loader import Family
-from src.eval.dev_split import TRUNCATION_FRACTIONS
 from src.eval.metrics import (
     exact_match,
     mean_reciprocal_rank,

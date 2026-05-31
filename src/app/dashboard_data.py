@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -93,12 +92,6 @@ def run_json_path(run_name: str) -> Path:
     return SWEEPS_DIR / f"{run_name}.json"
 
 
-def list_sweep_runs() -> list[str]:
-    if not SWEEPS_DIR.exists():
-        return []
-    return sorted(p.stem for p in SWEEPS_DIR.glob("*.json"))
-
-
 def wave_label(run: str) -> str:
     for prefix, label in WAVE_PREFIXES.items():
         if run.startswith(prefix):
@@ -106,16 +99,11 @@ def wave_label(run: str) -> str:
     return "other"
 
 
-def slurm_jobs() -> list[str]:
-    try:
-        out = subprocess.check_output(
-            ["squeue", "--me", "-h", "-o", "%j"],
-            text=True,
-            timeout=10,
-        )
-        return [ln.strip() for ln in out.splitlines() if ln.strip()]
-    except Exception:
-        return []
+def pipeline_rows() -> list[dict]:
+    return [
+        {"wave": wave, "focus": desc, "status": status, "note": note}
+        for wave, desc, status, note in PIPELINE_WAVES
+    ]
 
 
 def submission_csv_rows() -> list[dict[str, Any]]:
@@ -175,15 +163,6 @@ def progress_table(df: pd.DataFrame) -> pd.DataFrame:
         "task3_rule_attr": t1_rec.get("task3_rule_attr"),
     })
     return pd.DataFrame(rows)
-
-
-def pipeline_rows(jobs: list[str]) -> list[dict]:
-    """Return wave status from static submission-final snapshot."""
-    del jobs  # submission frozen — no live Slurm override
-    return [
-        {"wave": wave, "focus": desc, "status": status, "note": note}
-        for wave, desc, status, note in PIPELINE_WAVES
-    ]
 
 
 def metrics_sections(payload: dict[str, Any]) -> tuple[dict, dict, dict, dict]:

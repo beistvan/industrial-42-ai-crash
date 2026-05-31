@@ -6,7 +6,6 @@ from src.ml.transformer_model import (
     SequenceTrainingDataset,
     TransformerConfig,
     TransformerProcessModel,
-    build_transformer_model,
     collate_lm_batch,
 )
 
@@ -15,7 +14,6 @@ __all__ = [
     "TransformerConfig",
     "TransformerProcessModel",
     "SequenceTrainingDataset",
-    "build_transformer_model",
     "collate_lm_batch",
     "load_sequence_model",
 ]

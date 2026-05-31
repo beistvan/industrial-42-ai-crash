@@ -99,8 +99,7 @@ python scripts/sweep_transformer.py \
 bash scripts/regenerate_submission.sh
 ```
 
-On Leonardo (or any Slurm A100 cluster), `make leonardo-wave1` submits the full
-6-finalist sweep array directly. See `docs/LEONARDO_GPU_RUNBOOK.md`.
+On Leonardo (or any Slurm A100 cluster), use `scripts/leonardo/submit_sweep.sh` with the sweep YAMLs in `configs/sweeps/`. See `docs/LEONARDO_GPU_RUNBOOK.md`.
 
 ## What you need to actually run this
 

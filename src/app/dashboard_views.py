@@ -15,7 +15,6 @@ from src.app.dashboard_data import (
     REPO_ROOT,
     SUBMISSION_DIR,
     load_json,
-    load_leaderboard,
     metrics_sections,
     model_config_table,
     pick_winners,
@@ -23,7 +22,6 @@ from src.app.dashboard_data import (
     progress_table,
     repo_path,
     run_json_path,
-    slurm_jobs,
     submission_csv_rows,
     training_history_df,
     wave_label,
@@ -136,11 +134,8 @@ def render_overview(df: pd.DataFrame | None) -> None:
     st.subheader("Submission files")
     st.dataframe(pd.DataFrame(submission_csv_rows()), hide_index=True, width="stretch")
 
-    jobs = slurm_jobs()
-    if jobs:
-        st.subheader("GPU pipeline")
-        st.dataframe(pd.DataFrame(pipeline_rows(jobs)), hide_index=True, width="stretch")
-        st.caption(f"{len(jobs)} Slurm tasks running")
+    st.subheader("Sweep pipeline (final)")
+    st.dataframe(pd.DataFrame(pipeline_rows()), hide_index=True, width="stretch")
 
     with st.expander("Track 1 alignment"):
         st.markdown(TRACK_ALIGNMENT)

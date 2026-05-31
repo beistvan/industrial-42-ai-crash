@@ -115,7 +115,7 @@ python scripts/sweep_transformer.py \
 # → models/sweeps/g_drop15_nosched_t2.pt.best
 ```
 
-On Leonardo: `make leonardo-wave1`, `make leonardo-wave2`, or submit full arrays via `scripts/leonardo/submit_sweep.sh` — see [`docs/LEONARDO_GPU_RUNBOOK.md`](LEONARDO_GPU_RUNBOOK.md).
+On Leonardo, submit sweeps via `scripts/leonardo/submit_sweep.sh` — see [`docs/LEONARDO_GPU_RUNBOOK.md`](LEONARDO_GPU_RUNBOOK.md).
 
 **Generate judge CSVs:**
 
@@ -156,7 +156,7 @@ Eval split: `data/processed/dev_eval/` (600 T1/T2 items). Full per-run table: [`
 | Artifact | Purpose |
 |---|---|
 | [`REPORT.md`](../REPORT.md) | Jury-facing narrative, ADR links, honest limits |
-| [`RESULTS_GPU_SUMMARY.md`](../RESULTS_GPU_SUMMARY.md) | GPU sweep summary by Track 1 level |
+| [`artifacts/sweeps/LEADERBOARD_FINAL.md`](../artifacts/sweeps/LEADERBOARD_FINAL.md) | GPU sweep summary by Track 1 level |
 | `artifacts/sweeps/*.json` | Per-epoch metrics, loss curves (27+ runs) |
 | `artifacts/ngram_metrics.json` | Baseline numbers |
 | [`EVAL_DATA/eval_metrics.py`](../EVAL_DATA/eval_metrics.py) | Official scoring script |

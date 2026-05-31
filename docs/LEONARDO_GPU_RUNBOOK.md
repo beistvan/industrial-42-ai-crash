@@ -176,21 +176,7 @@ make regenerate-submission
 
 Optional reservation: `SLURM_RESERVATION=s_tra_ncc make regenerate-submission`
 
-## Parallel sweep queue (historical — hackathon phase)
-
-Submission is **final**. The targets below were used during active GPU sweeps.
-
-```bash
-export SWEEP_CONCURRENCY=32
-# export SLURM_RESERVATION=s_tra_ncc   # only if reservation is active
-
-make leonardo-queue-parallel    # Waves 3+4+6 — 24 jobs at once
-make leonardo-watch-pipeline    # auto-rebuild LEADERBOARD_FINAL while jobs run
-
-# When queue drains:
-make leonardo-leaderboard-final && make regenerate-submission
-make run-dashboard
-```
+Historical sweep scripts live under `scripts/leonardo/` (submit_sweep.sh, etc.).
 
 | Wave | YAML | Rows |
 |---|---|---:|

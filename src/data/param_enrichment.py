@@ -85,12 +85,3 @@ def prefix_end_for_steps(token_stream: list[str], keep_steps: int) -> int:
                 end += 1
             return end
     return len(token_stream)
-
-
-def collect_param_tokens(sequences: dict[Family, Sequences]) -> set[str]:
-    """All param aux tokens appearing in enriched streams."""
-    found: set[str] = set()
-    for seqs in sequences.values():
-        for stream in seqs.values():
-            found.update(t for t in stream if is_param_token(t))
-    return found

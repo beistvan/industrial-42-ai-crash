@@ -12,13 +12,11 @@ docs/implementation-plan-en.md.
 """
 from __future__ import annotations
 
-import json
 import math
 import pickle
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable
 
 from src.data.infineon_loader import Family, FAMILIES, Sequences
 from src.ml.beam_search import _beam_complete
@@ -228,6 +226,3 @@ class NGramBaseline:
                 fam: len(c) for fam, c in self.unconditional.items()
             },
         }
-
-    def stats_json(self) -> str:
-        return json.dumps(self.stats(), indent=2, sort_keys=True)

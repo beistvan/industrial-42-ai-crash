@@ -7,7 +7,6 @@ Trained from scratch on the Infineon step vocabulary — same inference API as
 from __future__ import annotations
 
 import math
-from dataclasses import asdict
 
 from src.ml.transformer_model import TransformerConfig, require_torch
 

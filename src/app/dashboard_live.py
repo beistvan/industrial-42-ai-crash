@@ -9,7 +9,6 @@ import streamlit as st
 
 from src.app.dashboard_data import MODELS_DIR, REPO_ROOT, load_json, repo_path
 from src.data import FAMILIES, load_all_families
-from src.data.step_metadata import describe_step
 from src.eval.anomaly_scoring import (
     compose_anomaly_score,
     log_prob_to_validity_score,

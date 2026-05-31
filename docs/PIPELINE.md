@@ -51,15 +51,11 @@ src/
 │   │                          injected anomalies with labels)
 │   ├── run_eval.py            evaluate_all(model, eval_dir) -> Task 1/2/3
 │   │                          (this repo's evaluator)
-│   └── local_eval.py          friend's independent evaluator (placeholder
-│                              — left for him to fill in so we cross-check)
-└── inference/
-    └── predict.py             placeholder for next phase
-
+│   └── local_eval.py          CLI wrapper around run_eval for one checkpoint
 scripts/
 ├── make_dev_split.py          load -> split -> persist ids + dev eval CSVs
 ├── train_ngram.py             load split -> fit -> evaluate -> save metrics
-├── train_transformer.py       placeholder for next phase
+├── train_transformer.py       train + evaluate Transformer checkpoints
 └── predict_submission.py      produce official submission CSVs
 
 tests/

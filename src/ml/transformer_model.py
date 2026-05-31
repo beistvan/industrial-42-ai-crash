@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from src.data.infineon_loader import (
     BOS_TOKEN,
@@ -520,28 +520,3 @@ class TransformerProcessModel:
             "vocab_size": len(self.vocab),
             "metadata": self.metadata,
         }
-
-
-def build_transformer_model(
-    vocab: Vocabulary,
-    config: TransformerConfig,
-    *,
-    device: str | None = None,
-    metadata: dict[str, Any] | None = None,
-    arch: str = "vanilla",
-) -> TransformerProcessModel:
-    """Create an untrained TransformerProcessModel wrapper."""
-    require_torch()
-    from src.ml.modern_transformer import build_process_net
-    model_type = "modern_decoder_only" if arch == "modern" else "transformer_decoder_only"
-    net = build_process_net(arch, len(vocab), config, vocab.pad_id)
-    return TransformerProcessModel(
-        net, vocab, config, device=device, metadata=metadata, model_type=model_type,
-    )
-
-
-def iter_step_tokens(sequences_per_family: dict[Family, Sequences]) -> Iterable[str]:
-    """Yield raw process-step strings from a family-indexed sequence mapping."""
-    for sequences in sequences_per_family.values():
-        for steps in sequences.values():
-            yield from steps
