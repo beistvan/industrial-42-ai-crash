@@ -149,6 +149,7 @@ def progress_table(df: pd.DataFrame) -> pd.DataFrame:
         "model": "n-gram (order 12)",
         "task1_mrr": BASELINE["task1_mrr"],
         "task2_tok_acc": BASELINE["task2_token_acc"],
+        "task3_rule_attr": BASELINE.get("task3_rule_attr"),
     }]
     for stage, run, tag in (
         ("Wave 1 T1", "f_drop15_100_mrr", "vanilla"),
@@ -161,6 +162,7 @@ def progress_table(df: pd.DataFrame) -> pd.DataFrame:
                 "model": f"{run} ({tag})",
                 "task1_mrr": round(score_task1(rec), 4),
                 "task2_tok_acc": round(score_task2(rec), 4),
+                "task3_rule_attr": rec.get("task3_rule_attr"),
             })
     t1_run = pick_task1_run(df.to_dict("records"))
     t2_run = pick_task2_run(df.to_dict("records"))
@@ -170,6 +172,7 @@ def progress_table(df: pd.DataFrame) -> pd.DataFrame:
         "model": f"{t1_run} + {t2_run}",
         "task1_mrr": round(score_task1(t1_rec), 4),
         "task2_tok_acc": round(score_task2(t2_rec), 4),
+        "task3_rule_attr": t1_rec.get("task3_rule_attr"),
     })
     return pd.DataFrame(rows)
 

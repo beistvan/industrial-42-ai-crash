@@ -10,6 +10,11 @@ import streamlit as st
 from src.app.dashboard_data import MODELS_DIR, REPO_ROOT, load_json, repo_path
 from src.data import FAMILIES, load_all_families
 from src.data.step_metadata import describe_step
+from src.eval.anomaly_scoring import (
+    compose_anomaly_score,
+    log_prob_to_validity_score,
+    sequence_log_prob,
+)
 from src.eval.metrics import normalized_edit_distance, token_accuracy
 from src.eval.rule_validator import classify_sequence
 from src.ml import load_sequence_model
@@ -84,7 +89,9 @@ def render_live_demo() -> None:
         pool = dev_ids.get(family) or sorted(sequences.get(family, {}).keys())
         sid = st.selectbox(f"Sequence ({len(pool)} available)", pool, key="live_sid")
     with c3:
-        prefix_pct = st.select_slider("Prefix %", 60, 80, 60, key="live_pct")
+        prefix_pct = st.select_slider(
+            "Prefix %", options=[60, 80], value=60, key="live_pct"
+        )
 
     full = sequences[family][sid] if sid else []
     if not full:
@@ -116,14 +123,37 @@ def render_live_demo() -> None:
     b.metric("NED", f"{ned:.3f}")
     c.metric("Pred / gold len", f"{len(pred_cont)}/{len(gold_cont)}")
 
-    st.markdown("### Task 3 — rule validator")
-    cf, cp = classify_sequence(full), classify_sequence(completed)
-    v1, v2 = st.columns(2)
+    st.markdown("### Task 3 — anomaly (hybrid: validator + T1 LM score)")
+    cf = classify_sequence(full)
+    lm_score = log_prob_to_validity_score(
+        sequence_log_prob(model, family, full),
+        len(full),
+    )
+    submission_score = compose_anomaly_score(
+        valid=cf["valid"],
+        rules=cf["rules"],
+        lm_score=lm_score,
+    )
+    v1, v2, v3 = st.columns(3)
     with v1:
-        st.write("Gold sequence:", "VALID" if cf["valid"] else f"INVALID ({cf['primary_rule']})")
+        st.metric(
+            "IS_VALID (validator)",
+            "valid" if cf["valid"] else "invalid",
+        )
+        if not cf["valid"]:
+            st.caption(f"PREDICTED_RULE: `{cf['primary_rule']}`")
     with v2:
-        st.write("Completion:", "VALID" if cp["valid"] else f"INVALID ({cp['primary_rule']})")
-    st.caption("Task 3 submission SCORE uses T1 LM log-prob; detection uses this validator.")
+        st.metric("LM SCORE (T1 checkpoint)", f"{lm_score:.4f}")
+    with v3:
+        st.metric("Submission SCORE", f"{submission_score:.4f}")
+
+    cp = classify_sequence(completed)
+    cp_label = "VALID" if cp["valid"] else f"INVALID ({cp['primary_rule']})"
+    st.caption(
+        f"Completion validity: {cp_label} · "
+        "Rule attribution is fixed validator logic (pick_primary_rule tie-break), "
+        "not a separate Task-3 finetune."
+    )
 
     payload = load_json(metrics_path) if metrics_path else None
     if payload:

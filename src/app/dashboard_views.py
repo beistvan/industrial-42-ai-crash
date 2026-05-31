@@ -62,7 +62,7 @@ def render_overview(df: pd.DataFrame | None) -> None:
 1. **Decoder-only Transformer** (~4M params) on ~3k official + 750 synthetic fab sequences  
 2. **Wave 3 modern stack** (RoPE + RMSNorm + SwiGLU) for Task 1 — winner **`{SUBMISSION['task1_run']}`**  
 3. **Wave 2 T2 specialist** with prefix training + beam search — **`{SUBMISSION['task2_run']}`**  
-4. **Task 3** — official rule validator + LM `SCORE` from the Task-1 checkpoint (no separate model)
+4. **Task 3** — hybrid on the **T1 checkpoint**: official rule validator for `IS_VALID` + `PREDICTED_RULE` (with `pick_primary_rule` tie-break); teacher-forced LM log-prob for `SCORE` — **no separate Task-3 model or finetune**
         """
     )
 
@@ -72,12 +72,23 @@ def render_overview(df: pd.DataFrame | None) -> None:
         return
 
     t1_run, t2_run, t1_score, t2_score = pick_winners(df)
-    m = st.columns(4)
+    t1_json = load_json(run_json_path(t1_run))
+    _, _, _, t3_from_t1 = metrics_sections(t1_json) if t1_json else ({}, {}, {}, {})
+    t3_rule_attr = t3_from_t1.get(
+        "rule_attribution_accuracy",
+        SUBMISSION.get("task3_rule_attr", 0.69),
+    )
+
+    m = st.columns(5)
     m[0].metric("T1 + anomaly", t1_run)
     m[1].metric("T1 MRR", f"{t1_score:.4f}")
     m[2].metric("T2 completion", t2_run)
     m[3].metric("T2 tok acc", f"{t2_score:.4f}")
-    st.info(f"Hybrid: `{t1_run}` → nextstep + anomaly · `{t2_run}` → completion.csv")
+    m[4].metric("T3 rule attrib.", f"{t3_rule_attr:.2f}")
+    st.info(
+        f"Hybrid: `{t1_run}` → nextstep + anomaly (validator + LM SCORE) · "
+        f"`{t2_run}` → completion.csv"
+    )
 
     for run in (t1_run, t2_run):
         ckpt = MODELS_DIR / f"{run}.pt.best"
@@ -87,13 +98,15 @@ def render_overview(df: pd.DataFrame | None) -> None:
     st.dataframe(progress_table(df), hide_index=True, width="stretch")
 
     # Load winner JSONs for full 3-task panel
-    t1_json = load_json(run_json_path(t1_run))
     t2_json = load_json(run_json_path(t2_run))
     if t1_json:
         _, t1, _, t3 = metrics_sections(t1_json)
         render_task_metrics(
             t1, {}, t3,
-            caption=f"T1 model `{t1_run}` on dev holdout (`{repo_path(DEV_EVAL_DIR)}`)",
+            caption=(
+                f"T1 model `{t1_run}` on dev holdout — Task 3 uses same checkpoint "
+                f"(validator + LM SCORE; rule attrib {t3.get('rule_attribution_accuracy', 0):.2f})"
+            ),
         )
     if t2_json:
         _, _, t2, _ = metrics_sections(t2_json)
@@ -148,7 +161,7 @@ def render_leaderboard(df: pd.DataFrame) -> None:
     st.subheader(f"Leaderboard ({len(df)} runs)")
     st.dataframe(
         display[["rank", "wave", "role", "run", "task1_mrr", "task1_top1",
-                 "task2_token_acc", "task2_ned", "best_epoch", "train_seconds"]],
+                 "task2_token_acc", "task2_ned", "task3_rule_attr", "best_epoch", "train_seconds"]],
         hide_index=True,
         width="stretch",
     )

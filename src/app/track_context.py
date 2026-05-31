@@ -8,6 +8,7 @@ BASELINE = {
     "task1_mrr": 0.807,
     "task2_token_acc": 0.421,
     "task3_f1": 1.00,
+    "task3_rule_attr": 0.66,
 }
 
 # Best trained / optimized checkpoints (Level 2+) — dev holdout.
@@ -21,6 +22,7 @@ SUBMISSION = {
     "task2_run": "g_drop15_nosched_t2",
     "task2_token_acc": 0.4545,
     "task3_f1": 1.00,
+    "task3_rule_attr": 0.69,
 }
 
 LEVELS = [
