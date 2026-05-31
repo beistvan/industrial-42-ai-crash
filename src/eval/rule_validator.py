@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Sequence
 
 from src.data.infineon_loader import _load_official_module
+from src.eval.anomaly_scoring import pick_primary_rule
 
 
 def _validate(steps: Sequence[str]):
@@ -27,15 +28,14 @@ def is_valid_sequence(steps: Sequence[str]) -> bool:
 
 
 def violation_rules(steps: Sequence[str]) -> list[str]:
-    """Distinct rule names triggered by the sequence, earliest step_index first.
-
-    The official validator can emit violations in checker order (e.g. all
-    "missing X" checks before all "Y before Z" checks), not in sequence order.
-    For Task 3 the most useful "primary" rule is the earliest-firing one in
-    the sequence — the first divergence from a valid trajectory.
-    """
+    """Distinct rule names triggered by the sequence, earliest step_index first."""
     violations = list(_validate(steps))
-    violations.sort(key=lambda v: (getattr(v, "step_index", 10**9), v.rule))
+    violations.sort(
+        key=lambda v: (
+            getattr(v, "step_index", 10**9),
+            v.rule,
+        )
+    )
     seen: list[str] = []
     for v in violations:
         if v.rule not in seen:
@@ -49,9 +49,10 @@ def classify_sequence(steps: Sequence[str]) -> dict:
     `primary_rule` is the rule fired at the smallest step_index; ties are
     broken by rule name for determinism.
     """
+    violations = list(_validate(steps))
     rules = violation_rules(steps)
     return {
         "valid": not rules,
         "rules": rules,
-        "primary_rule": rules[0] if rules else None,
+        "primary_rule": pick_primary_rule(violations),
     }

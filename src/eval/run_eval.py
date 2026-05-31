@@ -22,7 +22,8 @@ from src.eval.metrics import (
     token_accuracy,
     top_k_accuracy,
 )
-from src.eval.rule_validator import classify_sequence, is_valid_sequence
+from src.eval.anomaly_scoring import injection_label_matches_prediction
+from src.eval.rule_validator import classify_sequence
 
 
 class NextStepModel(Protocol):
@@ -212,12 +213,10 @@ def evaluate_anomaly(
         # Rule attribution: when both are invalid and the injected label
         # starts with a rule name like "RULE_X_drop_y", compare prefix.
         if gold_invalid and pred_invalid and gold["injected_label"]:
-            injected_rule = gold["injected_label"].split("_", 0)[0]
-            # Recover the rule prefix robustly.
-            for rule in pred["rules"]:
-                if gold["injected_label"].startswith(rule):
-                    rule_correct += 1
-                    break
+            if injection_label_matches_prediction(
+                gold["injected_label"], pred["rules"], pred["primary_rule"]
+            ):
+                rule_correct += 1
             rule_evaluated += 1
     n = tp + fp + tn + fn
     precision = tp / (tp + fp) if (tp + fp) else 0.0
