@@ -7,7 +7,7 @@ suffix in the index, and returns the top-k most likely next tokens. If no
 suffix of length >=1 matches, it backs off to the family's unconditional
 token distribution.
 
-This is the "naive baseline" required by docs/EVALUATION_PLAN.md and step 4 of
+This is the "naive baseline" required by Track 1 Level 1 and step 4 of
 docs/implementation-plan-en.md.
 """
 from __future__ import annotations

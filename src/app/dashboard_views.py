@@ -4,6 +4,7 @@ from __future__ import annotations
 import streamlit as st
 import pandas as pd
 
+from src.app.dashboard_charts import render_training_charts
 from src.app.dashboard_data import (
     DEV_EVAL_DIR,
     EVAL_PROTOCOL,
@@ -218,13 +219,7 @@ def render_training(df: pd.DataFrame | None) -> None:
         return
 
     st.subheader("Training curves")
-    st.line_chart(hist.set_index("epoch")[["train_loss", "dev_loss"]])
-    if hist["task1_mrr"].notna().any():
-        st.markdown("**Task 1 dev MRR per epoch**")
-        st.line_chart(hist.set_index("epoch")[["task1_mrr"]])
-    if hist["task2_tok_acc"].notna().any():
-        st.markdown("**Task 2 dev token accuracy per epoch**")
-        st.line_chart(hist.set_index("epoch")[["task2_tok_acc"]])
+    render_training_charts(hist, run_key=choice)
 
     best = payload.get("best", {})
     if best:

@@ -178,29 +178,12 @@ def progress_table(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def pipeline_rows(jobs: list[str]) -> list[dict]:
-    log_text = ""
-    for p in sorted((REPO_ROOT / "logs").glob("slurm-sweep-*.out"))[-24:]:
-        try:
-            log_text += p.read_text(encoding="utf-8", errors="replace")[:800]
-        except OSError:
-            pass
-    patterns = {
-        "Wave 1": ("f_", "m_"),
-        "Wave 2": ("g_",),
-        "Wave 3": ("h_mod_",),
-        "Wave 4": ("t2_mod_",),
-        "Wave 5": ("p5_",),
-        "Wave 6": ("s_",),
-    }
-    out = []
-    for wave, desc, default_status, note in PIPELINE_WAVES:
-        status = default_status
-        if any("zoh-sweep" in j for j in jobs):
-            prefs = patterns.get(wave, ())
-            if prefs and any(p in log_text for p in prefs):
-                status = "running"
-        out.append({"wave": wave, "focus": desc, "status": status, "note": note})
-    return out
+    """Return wave status from static submission-final snapshot."""
+    del jobs  # submission frozen — no live Slurm override
+    return [
+        {"wave": wave, "focus": desc, "status": status, "note": note}
+        for wave, desc, status, note in PIPELINE_WAVES
+    ]
 
 
 def metrics_sections(payload: dict[str, Any]) -> tuple[dict, dict, dict, dict]:
@@ -257,4 +240,7 @@ def model_config_table(payload: dict[str, Any]) -> pd.DataFrame:
         ("train_seconds", payload.get("train_seconds", "—")),
         ("eval_seconds", payload.get("eval_seconds", "—")),
     ]
-    return pd.DataFrame(rows, columns=["setting", "value"])
+    return pd.DataFrame(
+        [(k, str(v) if v is not None else "—") for k, v in rows],
+        columns=["setting", "value"],
+    )

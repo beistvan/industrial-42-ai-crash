@@ -38,8 +38,8 @@ requirements.txt, Makefile            Reproducibility
 
 | Task | Metric | n-gram | Best transformer (hybrid) |
 |---|---|---:|---:|
-| 1. Next-step | Top-1 | 0.687 | **0.748** |
-| 1. Next-step | MRR | 0.807 | **0.873** |
+| 1. Next-step | Top-1 | 0.687 | **0.75** |
+| 1. Next-step | MRR | 0.807 | **0.8735** |
 | 2. Completion | Token-acc | 0.421 | **0.455** |
 | 3. Anomaly | F1 (invalid) | — | **1.00** (rule validator) |
 
@@ -112,9 +112,9 @@ On Leonardo (or any Slurm A100 cluster), `make leonardo-wave1` submits the full
 
 ## Honest limits
 
-- **Task 1 plateau ≈ MRR 0.87**: Wave 1–2 hyperparam sweeps land within ~2pp on Task 1. Wave 2 improved Task 2 (+0.3 pp tok-acc). Further Task-1 gains likely need architecture change (Wave 3) or more data.
+- **Task 1 plateau broken by Wave 3**: modern stack (`h_mod_nosched_mrr`) reaches MRR **0.8735** (+0.05pp vs Wave 1). Wave 4/5 did not beat submission picks.
 - **Task 2** still leaves >50% of completion tokens incorrect — rule-constrained beam=5 helps but `token_accuracy` is structurally limited by the model's medium scale.
-- **Task 3 SCORE is heuristic** (`1 − n_violations/10`); on the judge eval all invalid sequences contain exactly 1 violation, so AUC = 1.0 by construction.
+- **Task 3** uses rule validator for detection + **T1 LM log-prob SCORE** (`src/eval/anomaly_scoring.py`); F1=1.00 on dev because rules separate cleanly.
 - **No pre-trained LLM** — see `docs/ADRs/0001-no-hf-pretrained.md` for why.
 
 ## License

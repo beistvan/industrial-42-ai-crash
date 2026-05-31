@@ -155,16 +155,16 @@ scp -r <USER>@login01-ext.leonardo.cineca.it:$SCRATCH/industrial-infineon/artifa
 scp -r <USER>@login01-ext.leonardo.cineca.it:$SCRATCH/industrial-infineon/result/submission ./results_submission_leonardo
 ```
 
-## Wave 1–2 submission numbers (dev holdout)
+## Final hybrid submission (dev holdout)
 
-| Model | Task 1 Top-1 | Task 1 MRR | Task 2 token-acc | Wave |
+| Model | Task 1 Top-1 | Task 1 MRR | Task 2 token-acc | Role |
 |---|---:|---:|---:|---|
 | N-gram baseline | 0.687 | 0.807 | 0.421 | L1 |
-| `f_drop15_100_mrr` (Task 1) | 0.748 | **0.873** | 0.437 | 1 |
-| `g_drop15_nosched_t2` (Task 2) | 0.738 | 0.867 | **0.455** | 2 |
+| **`h_mod_nosched_mrr`** | **0.75** | **0.874** | 0.437 | T1 + anomaly |
+| **`g_drop15_nosched_t2`** | 0.738 | 0.867 | **0.455** | T2 completion |
 
 See [`artifacts/sweeps/LEADERBOARD_FINAL.md`](../artifacts/sweeps/LEADERBOARD_FINAL.md)
-for the full 23-run table.
+for the full 27-run table.
 
 Regenerate submission CSVs after leaderboard updates (Leonardo login node submits
 GPU predict jobs via Slurm — do not load transformers locally):
@@ -176,9 +176,9 @@ make regenerate-submission
 
 Optional reservation: `SLURM_RESERVATION=s_tra_ncc make regenerate-submission`
 
-## Parallel sweep queue (max GPU use)
+## Parallel sweep queue (historical — hackathon phase)
 
-Default array concurrency is **32** (was 12). Tune with `SWEEP_CONCURRENCY`.
+Submission is **final**. The targets below were used during active GPU sweeps.
 
 ```bash
 export SWEEP_CONCURRENCY=32

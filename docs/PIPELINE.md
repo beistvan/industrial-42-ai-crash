@@ -1,5 +1,9 @@
 # Pipeline — train, validate, improve, review
 
+> **Note (2026-05-31):** This doc is partially stale. For submission-final
+> instructions use [`HANDOFF.md`](../HANDOFF.md), [`docs/SUBMISSION.md`](SUBMISSION.md),
+> and [`configs/sweeps/WINNING_RECIPES.md`](../configs/sweeps/WINNING_RECIPES.md).
+
 This is the working pipeline for the Infineon track. It targets the three
 scored tasks (next-step prediction, sequence completion, anomaly detection)
 and produces ready-to-submit CSVs.

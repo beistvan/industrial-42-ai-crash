@@ -11,10 +11,8 @@ BASELINE = {
     "task3_rule_attr": 0.66,
 }
 
-# Best trained / optimized checkpoints (Level 2+) — dev holdout.
-# Live picks for submission CSVs come from LEADERBOARD_FINAL.csv via
-# scripts/regenerate_submission.sh (see HANDOFF.md). Update these when
-# you want static UI copy to match the current hybrid submission.
+# Final hybrid submission (dev holdout). Live CSV picks come from
+# LEADERBOARD_FINAL.csv via scripts/regenerate_submission.sh (HANDOFF.md).
 SUBMISSION = {
     "task1_run": "h_mod_nosched_mrr",
     "task1_mrr": 0.8735,
@@ -44,18 +42,18 @@ LEVELS = [
         "items": [
             "Wave 1 Transformer finalists (vanilla ~4M params)",
             "Wave 2 hyperparam fine grid + hybrid Task-1/T2 specialists",
-            "Dev leaderboard + unified Streamlit dashboard (make run-dashboard)",
+            "Dev leaderboard + unified Streamlit dashboard (`make run-dashboard`)",
         ],
         "metric": f"MRR {SUBMISSION['task1_mrr']:.3f} · tok {SUBMISSION['task2_token_acc']:.3f}",
     },
     {
         "level": "Level 3",
         "title": "Scaling & architecture stretch",
-        "status": "in_progress",
+        "status": "done",
         "items": [
             "Data volume: 1× extras helps; 2× / 500-per-family hurts",
-            "Wave 3: modern stack (RoPE + RMSNorm + SwiGLU) — T1 leader h_mod_nosched_mrr",
-            "Wave 4: Task-2 prefix training (60–80%) + beam eval",
+            "Wave 3 modern stack (RoPE + RMSNorm + SwiGLU) — T1 leader h_mod_nosched_mrr",
+            "Wave 4 Task-2 prefix training — evaluated; did not beat g_drop15_nosched_t2",
         ],
         "metric": f"MRR {SUBMISSION['task1_mrr']:.3f} · tok {SUBMISSION['task2_token_acc']:.3f}",
     },
@@ -68,18 +66,18 @@ TRACK_ALIGNMENT = """
 |---|---|
 | Level 1: data + baseline | 3k official + 750 synthetic; n-gram baseline |
 | Level 2: train + tune + visible benchmark | Transformer Waves 1–2; dev LEADERBOARD; hybrid submission |
-| Level 3: scaling / architecture | Extras scaling study; Wave 3 modern arch; Wave 4 Task-2 training |
+| Level 3: scaling / architecture | Extras scaling study; Wave 3 modern arch (+0.05pp MRR); Wave 4 T2 experiment |
 | 3 submission tasks | `nextstep.csv` + `completion.csv` + `anomaly.csv` |
-| Baseline vs trained demo | Unified dashboard → **Live demo** tab |
+| Baseline vs trained demo | Unified dashboard → Overview / Training tabs |
 """ % TRACK_DOC_URL
 
 PIPELINE_WAVES = [
     ("Wave 1", "Vanilla Transformer finalists", "done", "f_drop15_100_mrr · f_extras_1x_100_t2"),
     ("Wave 2", "Hyperparam fine grid", "done", "g_drop15_nosched_t2 best T2 (0.455)"),
     ("Wave 3", "Modern architecture", "done", "h_mod_nosched_mrr best T1 (0.874)"),
-    ("Wave 4", "Task-2 prefix training", "running", "60–80% prefix + beam eval"),
-    ("Wave 5", "Parameter enrichment", "running", "p5_mod_* on GPU"),
-    ("Wave 6", "Large model + seed sweep", "planned", "8 rows — parallel with 3/4"),
+    ("Wave 4", "Task-2 prefix training", "done", "no gain vs Wave 2 T2 specialist"),
+    ("Wave 5", "Parameter enrichment", "skipped", "not needed — Wave 3 beat T1 bar"),
+    ("Wave 6", "Large model + seed sweep", "skipped", "optional post-submission experiment"),
 ]
 
 SCALING_ROWS = [

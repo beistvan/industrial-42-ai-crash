@@ -14,10 +14,11 @@ from pathlib import Path
 
 REQUIRED_FILES = [
     Path("README.md"),
+    Path("REPORT.md"),
+    Path("HANDOFF.md"),
+    Path("docs/SUBMISSION.md"),
     Path("src/app/dashboard.py"),
     Path("src/app/dashboard_data.py"),
-    Path("docs/MODEL_PLAN.md"),
-    Path("docs/EVALUATION_PLAN.md"),
     Path("data/processed/splits/train_ids.json"),
     Path("data/processed/splits/dev_ids.json"),
     Path("data/processed/dev_eval/eval_input_valid_dev.csv"),

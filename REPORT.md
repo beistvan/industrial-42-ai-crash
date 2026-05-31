@@ -14,13 +14,13 @@ decoder-only Transformer (~4M params) trained from scratch on the Infineon
 domain vocabulary. Submission uses a **hybrid of two trained models** — best by
 MRR for next-step prediction, best by token-accuracy for sequence completion —
 plus the official rule validator with a continuous SCORE for anomaly detection.
-On our held-out dev split this lands at **Top-1 0.748 / MRR 0.873** for Task 1,
+On our held-out dev split this lands at **Top-1 0.75 / MRR 0.8735** for Task 1,
 **token-accuracy 0.455 / NED 0.223** for Task 2, and **F1 1.00** for Task 3 —
 all materially above the n-gram baseline (Top-1 0.687 / MRR 0.807 / tok 0.421).
 
 Structured by [Track 1 Levels](https://docs.zero-one.lumos-consulting.at/tracks/track-1/):
 **Level 1** data + n-gram baseline → **Level 2** Transformer train/tune (Waves 1–2)
-→ **Level 3** scaling study + modern architecture (Waves 3–4, in flight).
+→ **Level 3** scaling study + modern architecture (Wave 3 delivered T1 gain).
 
 ---
 
@@ -29,8 +29,8 @@ Structured by [Track 1 Levels](https://docs.zero-one.lumos-consulting.at/tracks/
 | Level | Requirement | What we did | Headline (dev) |
 |---|---|---|---|
 | **Level 1** | Data + baseline | 3k official sequences + 750 synthetic extras; n-gram suffix-backoff (order 12) | MRR **0.807**, tok **0.421** |
-| **Level 2** | Train → tune → visible benchmark | Vanilla Transformer Waves 1–2; 23-run dev leaderboard; Streamlit demo + sweep dashboard | MRR **0.873**, tok **0.455** |
-| **Level 3** | Scaling / architecture | Extras scaling (1× helps, 2×/500 hurts); Wave 3 RoPE/RMSNorm/SwiGLU; Wave 4 Task-2 prefix training | in flight |
+| **Level 2** | Train → tune → visible benchmark | Vanilla Transformer Waves 1–2; 27-run dev leaderboard; unified dashboard | MRR **0.874**, tok **0.455** |
+| **Level 3** | Scaling / architecture | Extras scaling (1× helps, 2×/500 hurts); Wave 3 RoPE/RMSNorm/SwiGLU **done**; Wave 4 T2 prefix **no gain** | MRR **0.874**, tok **0.455** |
 
 **Baseline → trained → optimized:**
 
@@ -39,6 +39,7 @@ Structured by [Track 1 Levels](https://docs.zero-one.lumos-consulting.at/tracks/
 | Level 1 baseline | n-gram | 0.807 | 0.421 | — |
 | Level 2 trained | `f_drop15_100_mrr` (Wave 1) | **0.873** | 0.437 | +6.6 pp MRR |
 | Level 2 optimized | `g_drop15_nosched_t2` (Wave 2 T2) | 0.867 | **0.455** | +3.4 pp tok |
+| **Submission hybrid** | `h_mod_nosched_mrr` + `g_drop15_nosched_t2` | **0.874** | **0.455** | Wave 3 T1 + Wave 2 T2 |
 
 ---
 
@@ -95,9 +96,9 @@ Five key technical decisions:
 
 5. **Continuous anomaly SCORE.**
    The judge's anomaly task asks for `IS_VALID, SCORE, PREDICTED_RULE`. SCORE
-   feeds AUC. A binary 1.0/0.0 score works only if classification is perfect —
-   ours uses `1 − n_violations/10` to remain monotone and informative under
-   noisier validators.
+   feeds AUC. We use teacher-forced LM log-probability from the Task-1 checkpoint
+   (`src/eval/anomaly_scoring.py`); detection and rule ID come from the official
+   rule validator with `pick_primary_rule` tie-break.
 
 ### Hyperparameter sweep on Leonardo (CINECA EuroHPC A100)
 
@@ -106,10 +107,10 @@ Five key technical decisions:
 | Shortlist | 12 | 50 | One-knob-at-a-time over lr, dropout, label_smoothing, scheduler, warmup, extras |
 | Wave 1 finalists | 6 | 100–150 | Extended winners, added Task-2 specialists, re-enabled AMP, eval_task2_every=5 |
 | Wave 2 fine grid | 5 | 100–150 | Dropout neighbours, no-scheduler × Task-2 selection — **best T2: `g_drop15_nosched_t2`** |
-| Wave 3 modern arch | 4 | 100 | RoPE + RMSNorm + SwiGLU + pre-norm (in flight) |
-| Wave 4 Task-2 prefix | 4 | 100 | 60–80% prefix training + beam eval (in flight) |
+| Wave 3 modern arch | 8 | 100 | RoPE + RMSNorm + SwiGLU + pre-norm — **best T1: `h_mod_nosched_mrr`** |
+| Wave 4 Task-2 prefix | 8 | 100 | 60–80% prefix training — **did not beat T2 bar** |
 
-Submitted hybrid uses Wave 1 Task-1 winner + Wave 2 Task-2 winner.
+Submitted hybrid uses Wave 3 Task-1 winner + Wave 2 Task-2 winner.
 
 ---
 
@@ -130,15 +131,15 @@ make dev-split && make train-ngram && pytest -q
 # Synthetic augmentation (deterministic, seed=101)
 python scripts/generate_extra_sequences.py --count-per-family 250 --seed 101 --force
 
-# Train both finalists from the sweep YAML
-python scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_final.yaml \
-    --stage finalists --row 2     # f_drop15_100_mrr   (Task-1 winner)
+# Train Task 1 leader (Wave 3 modern, row 4)
+python scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_modern.yaml \
+    --stage finalists --row 4     # h_mod_nosched_mrr   (Task-1 winner)
 python scripts/sweep_transformer.py --sweep configs/sweeps/leonardo_fine.yaml \
     --stage finalists --row 4     # g_drop15_nosched_t2 (Task-2 winner, Wave 2)
 
 # Hybrid submission
 python scripts/predict_submission.py \
-    --model models/sweeps/f_drop15_100_mrr.pt.best \
+    --model models/sweeps/h_mod_nosched_mrr.pt.best \
     --eval-valid EVAL_DATA/eval_input_valid.csv \
     --eval-anomaly EVAL_DATA/eval_input_anomaly.csv \
     --out-dir result/reproduce \
@@ -172,9 +173,9 @@ plain CLI rows via `--row N`.
 
 | File | Model | Selection criterion | Headline metric |
 |---|---|---|---|
-| `nextstep.csv` | `f_drop15_100_mrr.pt.best` | save-best-by `dev_mrr` | **MRR 0.8731, Top-1 0.7483** |
+| `nextstep.csv` | `h_mod_nosched_mrr.pt.best` | save-best-by `dev_mrr` | **MRR 0.8735, Top-1 0.75** |
 | `completion.csv` | `g_drop15_nosched_t2.pt.best` | save-best-by `dev_token_acc` | **dev_token_acc 0.4545** |
-| `anomaly.csv` | rule validator + SCORE heuristic | — | **F1 1.00, AUC 1.00 (rules separate cleanly)** |
+| `anomaly.csv` | rule validator + T1 LM SCORE | — | **F1 1.00** (validator); rule attrib 0.69 |
 
 ### Baseline vs transformer (all three tasks)
 
@@ -182,7 +183,7 @@ plain CLI rows via `--row N`.
 |---|---:|---:|---:|
 | N-gram suffix-backoff (order 12) | 0.807 | 0.421 | 1.00 |
 | Transformer Wave-1 (T1 specialist) | **0.873** | 0.437 | 1.00 |
-| **Hybrid Wave 1+2** | **0.873** | **0.455** | 1.00 |
+| **Hybrid Wave 3+2** | **0.874** | **0.455** | 1.00 |
 
 ### Baseline vs transformer (Task 1 detail)
 
@@ -190,7 +191,7 @@ plain CLI rows via `--row N`.
 |---|---:|---:|---:|---:|
 | N-gram suffix-backoff (order 12) | 0.687 | 0.928 | 0.928 | 0.807 |
 | Transformer shortlist best | 0.747 | — | 1.000 | 0.872 |
-| **Transformer Wave-1 hybrid** | **0.748** | — | **1.000** | **0.873** |
+| **Transformer submission (T1)** | **0.75** | — | **1.000** | **0.874** |
 
 Per-family n-gram breakdown:
 
@@ -202,18 +203,17 @@ Per-family n-gram breakdown:
 
 ### Sweep evidence
 
-Full leaderboard with **23 ranked runs** (12 shortlist + 6 wave-1 finalists + 5 wave-2)
-is at `artifacts/sweeps/LEADERBOARD_FINAL.md`. Per-run training history is in
-`artifacts/sweeps/{f,m,g}_*.json` — auditable.
+Full leaderboard with **27 ranked runs** is at `artifacts/sweeps/LEADERBOARD_FINAL.md`.
+Per-run training history is in `artifacts/sweeps/{m,f,g,h}_*.json` — auditable.
 
 Top 5 by `dev_mrr`:
 
 | Rank | Run | dev_mrr | Top-1 | best_epoch | Note |
 |---:|---|---:|---:|---:|---|
-| 1 | `f_drop15_100_mrr` | **0.8731** | 0.7483 | 84/100 | Wave 1 — dropout 0.15, AMP on |
-| 2 | `g_drop15_t2` | 0.8722 | 0.7483 | 90/108 | Wave 2 — peak MRR, T2 selection |
-| 3 | `m_drop15` | 0.8718 | 0.7467 | 40/50 | shortlist version |
-| 4 | `m_drop20` | 0.8715 | 0.7467 | 48/50 | dropout 0.20 |
+| 1 | **`h_mod_nosched_mrr`** | **0.8735** | 0.75 | 85/100 | Wave 3 — modern arch, nosched |
+| 2 | `f_drop15_100_mrr` | 0.8731 | 0.7483 | 84/100 | Wave 1 — previous T1 leader |
+| 3 | `g_drop15_t2` | 0.8722 | 0.7483 | 90/108 | Wave 2 — peak MRR, T2 selection |
+| 4 | `m_drop15` | 0.8718 | 0.7467 | 40/50 | shortlist version |
 | 5 | `m_real_extras_1x` | 0.8715 | 0.7467 | 50/50 | default recipe + 1× extras |
 
 Top by `dev_token_acc` (Task 2 specialists):
@@ -242,9 +242,9 @@ Top by `dev_token_acc` (Task 2 specialists):
 - **Rule-constrained decoding** gave a visible, qualitative jump on Task 2.
   Unconstrained greedy frequently produced step sequences violating the grammar;
   constrained beam=5 stays physically plausible end-to-end.
-- **Wave 2 fine grid (~45 min GPU).** Five rows around the winning recipe
-   tightened Task 2: `g_drop15_nosched_t2` reached **0.4545 token-acc** (+0.3 pp
-   over Wave 1). Task 1 MRR plateau held at ~0.873 — Wave 1 winner unchanged.
+- **Wave 3 modern architecture (+0.05pp MRR).** RoPE + RMSNorm + SwiGLU broke the
+  Task-1 plateau: `h_mod_nosched_mrr` reached **0.8735 MRR** vs Wave 1 `f_drop15_100_mrr`
+  at 0.8731. Submission T1 checkpoint updated accordingly.
 - **Hybrid two-model approach.** Decoupling selection criteria was a small change
   with a real delta on Task 2.
 - **N-gram suffix-backoff as a baseline.** Sanity-checked everything and gave
@@ -269,10 +269,10 @@ Top by `dev_token_acc` (Task 2 specialists):
 - **A teammate's commit flipped 99% of repo line endings to CRLF.** Caused a
   noisy 400k-line "diff" on a 12k-line repo. Resolved by cherry-picking only
   the semantic changes and re-normalizing on pull.
-- **Anomaly SCORE is a heuristic, not a true likelihood.** The proper
-  implementation is per-step LM log-probability summed over the sequence.
-  Skipped because the rule validator already classifies perfectly on the dev
-  set, so an improved SCORE wouldn't move F1 or AUC on this benchmark.
+- **Wave 4 Task-2 prefix training did not beat the T2 bar.** Eight runs with
+  60–80% prefix training stayed below `g_drop15_nosched_t2` (0.4545 tok-acc).
+- **Anomaly rule attribution ~0.69 on dev.** Validator `pick_primary_rule` tie-break
+  helps; injected mutation labels sometimes trigger a different rule than labelled.
 
 ## What we'd do with another 36 hours
 
@@ -281,11 +281,9 @@ Top by `dev_token_acc` (Task 2 specialists):
 
 2. ~~**Wave 2 fine grid (~45 min).**~~ **Done** — `g_drop15_nosched_t2` best T2.
 
-3. ~~**RoPE + RMSNorm + pre-norm Transformer (~2 h impl, ~1 h train).**~~ **Wave 3
-   submitted** — results pending on Leonardo.
+3. ~~**RoPE + RMSNorm + pre-norm Transformer.**~~ **Done** — `h_mod_nosched_mrr` best T1.
 
-4. **Per-step LM likelihood for Task 3 SCORE.** Sum log-probabilities of each step
-   given prior context — ~50 lines.
+4. ~~**Per-step LM likelihood for Task 3 SCORE.**~~ **Done** — shipped in submission.
 
 5. **Larger model (d_model=384, 8 layers).** Skip if seed-robustness shows
    medium-config noise dominates current gaps.
@@ -303,16 +301,17 @@ Mapped to the [Zero One Track 1](https://docs.zero-one.lumos-consulting.at/track
 | **MVP:** at least one trained model | ✅ | Transformer ~4M params + n-gram baseline |
 | **MVP:** baseline vs post-training comparison | ✅ | Dev metrics, unified dashboard (`make run-dashboard`) |
 | **MVP:** documented benchmark | ✅ | `LEADERBOARD_FINAL`, `REPORT.md`, per-run JSONs |
-| **Stretch:** multiple architectures | 🔄 | Vanilla done; Wave 3 modern stack in flight |
+| **Stretch:** multiple architectures | ✅ | Vanilla + Wave 3 modern stack (`h_mod_nosched_mrr`) |
 | **Stretch:** scaling effects | ✅ | Level 3 data scaling table (1× helps, 2×/500 hurts) |
-| **Stretch:** demonstrator (before/after) | ✅ | `make run-dashboard` — Live demo tab, n-gram vs Transformer, 3 tasks |
-| **Stretch:** optional process parameters | 🔄 Wave 5 | Training-only aux tokens; ADR 0004; run if Wave 3/4 plateau |
+| **Stretch:** demonstrator (before/after) | ✅ | `make run-dashboard` — Overview / Training tabs |
+| **Stretch:** optional process parameters | ⏭ skipped | Wave 5 not needed — Wave 3 beat T1 bar |
 | **Stretch:** OOD / modified sequences | ⏳ judge | Task 4 evaluated by organizers on hidden set |
 | **Stretch:** model size ladder | ⏳ | ~4M params only; larger config scaffolded, not run |
 | **Format:** training + eval report | ✅ | This report + GPU summary + leaderboard |
 | **Learning objectives** | ✅ | Leonardo training, synthetic data, benchmarking, scaling analysis |
 
-**After Wave 3/4 finish:** `make leonardo-wave5-if-needed`, rebuild leaderboard, `make regenerate-submission`, update this table.
+Submission is **final** — hybrid `h_mod_nosched_mrr` + `g_drop15_nosched_t2`.
+Re-run `make regenerate-submission` only if a new sweep beats the current picks.
 
 ---
 
@@ -345,7 +344,7 @@ choices, and the final architecture are team decisions. Every PR was
 human-reviewed.
 
 **Inspiration**: nanoGPT (Karpathy) for the from-scratch decoder approach;
-the open-LLM community for RoPE/SwiGLU/RMSNorm patterns we'd port next.
+modern decoder patterns (RoPE, RMSNorm, SwiGLU) in `src/ml/modern_transformer.py`.
 
 ---
 

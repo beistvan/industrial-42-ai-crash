@@ -34,8 +34,8 @@ lint:
 run-dashboard: check-app
 	$(PYTHON) -m streamlit run src/app/dashboard.py --server.port $(STREAMLIT_PORT)
 
-# Deprecated aliases — all point to the unified dashboard
-run-demo run-sweep-dashboard: run-dashboard
+# Short alias + deprecated entry points — all launch the unified dashboard
+dashboard run-demo run-sweep-dashboard: run-dashboard
 
 # Full local sanity path: real dev split, n-gram baseline, full tests, smoke report.
 # Transformer tests no longer skip: without PyTorch they fail with an install hint.
@@ -75,7 +75,7 @@ train-transformer-medium: check-torch
 local-eval-transformer: check-torch
 	$(PYTHON) src/eval/local_eval.py --model models/transformer_small.pt --out artifacts/transformer_local_eval_metrics.json
 
-TRANSFORMER_MODEL ?= models/sweeps/f_drop15_100_mrr.pt.best
+TRANSFORMER_MODEL ?= models/sweeps/h_mod_nosched_mrr.pt.best
 TRANSFORMER_OUT   ?= result/dev
 predict-dev-transformer: check-torch
 	$(PYTHON) scripts/predict_submission.py \
@@ -139,6 +139,9 @@ leonardo-wave6:
 
 leonardo-wave-lite:
 	bash scripts/leonardo/submit_sweep.sh configs/sweeps/leonardo_lite.yaml finalists
+
+leonardo-wave-quick-arch:
+	bash scripts/leonardo/submit_sweep.sh configs/sweeps/leonardo_quick_arch.yaml finalists
 
 leonardo-wave5-if-needed:
 	bash scripts/leonardo/wave5_if_needed.sh

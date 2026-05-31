@@ -80,7 +80,7 @@ Checkpoints (`models/sweeps/*.pt.best`) are gitignored except the two submission
 
 **T1 recipe (`h_mod_nosched_mrr`):** modern arch, dropout 0.15, no scheduler, 100 ep, AMP, label smoothing 0.1, extras 1×, best @ ep 85.
 
-**T2 recipe (`g_drop15_nosched_t2`):** vanilla arch, dropout 0.15, no scheduler, prefix training 60–80%, save by token-acc, best @ ep 80.
+**T2 recipe (`g_drop15_nosched_t2`):** vanilla arch, dropout 0.15, no scheduler, save by token-acc, best @ ep 80.
 
 Full sweep row definitions: [`configs/sweeps/WINNING_RECIPES.md`](../configs/sweeps/WINNING_RECIPES.md) (T1 **row 4**, T2 **row 4**).
 
@@ -138,7 +138,7 @@ Eval split: `data/processed/dev_eval/` (600 T1/T2 items). Full per-run table: [`
 | Task | Metric | N-gram baseline | Hybrid submission | Lift |
 |---|---:|---:|---:|---|
 | **1** Next-step | MRR | 0.807 | **0.873** | +6.6 pp |
-| **1** Next-step | Top-1 | 0.687 | **0.748** | +6.1 pp |
+| **1** Next-step | Top-1 | 0.687 | **0.75** | +6.3 pp |
 | **2** Completion | Token-acc | 0.421 | **0.455** | +3.4 pp |
 | **2** Completion | NED | — | **0.223** | lower is better |
 | **3** Anomaly | F1 (invalid) | — | **1.00** | rule validator |
@@ -218,7 +218,7 @@ Before **09:45**:
 - [ ] No secrets in git history  
 - [ ] Fresh clone smoke test passes (`make dev-split && make train-ngram && pytest -q`)
 
-If GPU sweeps finish before deadline: `make leonardo-leaderboard-final && make regenerate-submission`, then re-check CSVs with `bash scripts/leonardo/status_now.sh`.
+Submission is **final** (`h_mod_nosched_mrr` + `g_drop15_nosched_t2`). Re-run only if a new sweep beats the bar: `make leonardo-leaderboard-final && make regenerate-submission`.
 
 ---
 

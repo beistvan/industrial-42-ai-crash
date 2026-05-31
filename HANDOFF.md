@@ -47,22 +47,23 @@ No changes needed to `rule_validator`, `anomaly_scoring`, or Task-3 tests when m
 ## Headline numbers (local dev holdout — *not* official organizer eval)
 
 Eval set: `data/processed/dev_eval/` (600 Task-1/2 items, injected anomalies for Task-3).
-Full table: `artifacts/sweeps/LEADERBOARD_FINAL.csv` (23 runs after Wave 2).
+Full table: `artifacts/sweeps/LEADERBOARD_FINAL.csv` (27 runs).
 
-### Baseline → trained → optimized
+### Baseline → trained → submission
 
 | Stage | Model | Task-1 MRR | Task-1 Top-1 | Task-2 token acc | Task-3 F1 |
 |---|---|---:|---:|---:|---:|
 | Level 1 baseline (n-gram) | `ngram_baseline.pkl` | 0.807 | 0.687 | 0.421 | 1.00 |
-| Level 2 trained (Wave 1 T1) | `f_drop15_100_mrr` | **0.873** | **0.748** | 0.437 | 1.00 |
+| Level 2 trained (Wave 1 T1) | `f_drop15_100_mrr` | 0.873 | 0.748 | 0.437 | 1.00 |
 | Level 2 optimized (Wave 2 T2) | `g_drop15_nosched_t2` | 0.867 | 0.738 | **0.455** | 1.00 |
+| **Submission hybrid** | `h_mod_nosched_mrr` + T2 above | **0.874** | **0.75** | **0.455** | 1.00 |
 
 ### Lift vs n-gram
 
 | Metric | Baseline → submission | Δ |
 |---|---|---|
-| Task-1 MRR | 0.807 → 0.873 | **+8.2% relative** |
-| Task-1 Top-1 | 68.7% → 74.8% | **+6.1 pp** |
+| Task-1 MRR | 0.807 → 0.874 | **+8.3% relative** |
+| Task-1 Top-1 | 68.7% → 75.0% | **+6.3 pp** |
 | Task-2 token acc | 0.421 → 0.455 | **+3.4 pp** |
 
 Task-1 Top-5: **100%** on strong Transformer runs.
@@ -95,12 +96,14 @@ Architecture: **family-conditioned decoder-only Transformer** (from scratch, no 
 
 ## How each submission model was built
 
-### Task 1 — `f_drop15_100_mrr` (Wave 1)
+### Task 1 — `h_mod_nosched_mrr` (Wave 3)
 
-100 epochs, dropout 0.15, extras 1×, cosine scheduler, AMP, label smoothing 0.1.
-Best checkpoint at **epoch 84 by dev_mrr**.
+100 epochs, modern arch (RoPE + RMSNorm + SwiGLU), dropout 0.15, no scheduler,
+extras 1×, AMP, label smoothing 0.1. Best checkpoint at **epoch 85 by dev_mrr**.
 
-Config: `configs/sweeps/leonardo_final.yaml` → row `f_drop15_100_mrr`.
+Config: `configs/sweeps/leonardo_modern.yaml` → row `h_mod_nosched_mrr` (row 4).
+
+Supersedes Wave 1 leader `f_drop15_100_mrr` (+0.05pp MRR).
 
 ### Task 2 — `g_drop15_nosched_t2` (Wave 2)
 
@@ -154,40 +157,33 @@ bash scripts/regenerate_submission.sh
 
 ```bash
 python -m src.eval.local_eval \
-  --model models/sweeps/f_drop15_100_mrr.pt.best \
+  --model models/sweeps/h_mod_nosched_mrr.pt.best \
   --device cuda \
-  --out artifacts/local_eval_f_drop15_100_mrr.json
+  --out artifacts/local_eval_h_mod_nosched_mrr.json
 ```
 
 ---
 
-## Pipeline status
+## Pipeline status (submission final)
 
 | Wave | Status | Best pick |
 |---|---|---|
-| Wave 1 | done | `f_drop15_100_mrr` (T1), `f_extras_1x_100_t2` (T1-era T2) |
+| Wave 1 | done | `f_drop15_100_mrr` (T1-era), `f_extras_1x_100_t2` (T1-era T2) |
 | Wave 2 | done | `g_drop15_nosched_t2` (T2) |
-| Wave 3 | done | `h_mod_nosched_mrr` (T1, MRR 0.874) |
-| Wave 4 | in flight | Task-2 prefix training — update when done |
-| Wave 6 | planned | large model + seed robustness (8 rows) |
+| Wave 3 | done | **`h_mod_nosched_mrr` (T1, MRR 0.874)** |
+| Wave 4 | done | no gain vs Wave 2 T2 |
+| Wave 5 | skipped | not needed |
+| Wave 6 | skipped | optional experiment |
 
-### Max GPU utilization (parallel queue)
+### Optional HPC appendix (historical)
 
 ```bash
-export SWEEP_CONCURRENCY=32          # tune to your quota (was 12)
-# export SLURM_RESERVATION=s_tra_ncc  # if reservation active
-
-make leonardo-queue-parallel         # Waves 3+4+6 in parallel (24 jobs)
-make leonardo-queue-all              # above + Wave 5 if gate passes
-make leonardo-watch-pipeline         # auto-rebuild LEADERBOARD_FINAL every 5 min
-
-# When idle:
 make leonardo-leaderboard-final
 make regenerate-submission
 make run-dashboard
 ```
 
-After Wave 3/4: `make leonardo-wave5-if-needed` (auto-gate) or `make leonardo-wave5` (force).
+See `docs/LEONARDO_GPU_RUNBOOK.md` for full Leonardo reproduction.
 
 ---
 
@@ -197,7 +193,7 @@ After Wave 3/4: `make leonardo-wave5-if-needed` (auto-gate) or `make leonardo-wa
 |---|---|
 | `REPORT.md` | Jury-facing write-up + Track 1 compliance |
 | `RESULTS_GPU_SUMMARY.md` | GPU sweep summary by Level 1/2/3 |
-| `artifacts/sweeps/LEADERBOARD_FINAL.csv` | All run numbers (23 rows) |
+| `artifacts/sweeps/LEADERBOARD_FINAL.csv` | All run numbers (27 rows) |
 | `result/submission/*.csv` | Official submission outputs |
 | `scripts/regenerate_submission.sh` | Re-pick T1/T2 from leaderboard + predict |
 | `EVAL_DATA/` | Organizer eval inputs |
