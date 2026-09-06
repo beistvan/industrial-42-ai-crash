@@ -348,19 +348,19 @@ Mapped to the [Zero One Track 1](https://docs.zero-one.lumos-consulting.at/track
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| **MVP:** reproducible end-to-end workflow | ✅ | `Makefile`, `docs/PIPELINE.md`, `make smoke` (58 pytest tests) |
-| **MVP:** synthetic data generation | ✅ | `scripts/generate_extra_sequences.py` (+750 seq) |
-| **MVP:** at least one trained model | ✅ | Transformer ~4M params + n-gram baseline |
-| **MVP:** baseline vs post-training comparison | ✅ | Dev metrics, unified dashboard (`make run-dashboard`) |
-| **MVP:** documented benchmark | ✅ | `LEADERBOARD_FINAL`, `REPORT.md`, per-run JSONs |
-| **Stretch:** multiple architectures | ✅ | Vanilla + Wave 3 modern stack (`h_mod_nosched_mrr`) |
-| **Stretch:** scaling effects | ✅ | Level 3 data scaling table (1× helps, 2×/500 hurts) |
-| **Stretch:** demonstrator (before/after) | ✅ | `make run-dashboard` — **Eval matrix** tab (arms A–D) + Live demo |
+| **MVP:** reproducible end-to-end workflow | OK | `Makefile`, `docs/PIPELINE.md`, `make smoke` (58 pytest tests) |
+| **MVP:** synthetic data generation | OK | `scripts/generate_extra_sequences.py` (+750 seq) |
+| **MVP:** at least one trained model | OK | Transformer ~4M params + n-gram baseline |
+| **MVP:** baseline vs post-training comparison | OK | Dev metrics, unified dashboard (`make run-dashboard`) |
+| **MVP:** documented benchmark | OK | `LEADERBOARD_FINAL`, `REPORT.md`, per-run JSONs |
+| **Stretch:** multiple architectures | OK | Vanilla + Wave 3 modern stack (`h_mod_nosched_mrr`) |
+| **Stretch:** scaling effects | OK | Level 3 data scaling table (1× helps, 2×/500 hurts) |
+| **Stretch:** demonstrator (before/after) | OK | `make run-dashboard` — **Eval matrix** tab (arms A–D) + Live demo |
 | **Stretch:** optional process parameters | ⏭ skipped | Wave 5 not needed — Wave 3 beat T1 bar |
 | **Stretch:** OOD / modified sequences | ⏳ judge | Task 4 evaluated by organizers on hidden set |
 | **Stretch:** model size ladder | ⏳ | ~4M params only; larger config scaffolded, not run |
-| **Format:** training + eval report | ✅ | This report + `LEADERBOARD_FINAL` + per-run JSONs |
-| **Learning objectives** | ✅ | GPU training, synthetic data, benchmarking, scaling analysis |
+| **Format:** training + eval report | OK | This report + `LEADERBOARD_FINAL` + per-run JSONs |
+| **Learning objectives** | OK | GPU training, synthetic data, benchmarking, scaling analysis |
 
 Submission is **final** — hybrid `h_mod_nosched_mrr` + `g_drop15_nosched_t2`.
 Re-run `make leaderboard-final && make regenerate-submission` only if a new
