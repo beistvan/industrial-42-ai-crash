@@ -25,9 +25,9 @@ process-rule violations.
 
 | Level | What | Status | Dev headline |
 |---|---|---|---|
-| **1** | Data + n-gram baseline | ✅ done | MRR 0.807 · NED 0.227 |
-| **2** | Train → tune → benchmark | ✅ done | MRR **0.874** · NED **0.223** |
-| **3** | Scaling + modern architecture | ✅ done | Wave 3 broke T1 plateau |
+| **1** | Data + n-gram baseline | done | MRR 0.807 · NED 0.227 |
+| **2** | Train → tune → benchmark | done | MRR **0.874** · NED **0.223** |
+| **3** | Scaling + modern architecture | done | Wave 3 broke T1 plateau |
 
 **Baseline → trained → optimized:** n-gram → Wave 1 Transformer → Wave 3 modern T1 + Wave 2 T2 specialist.
 
